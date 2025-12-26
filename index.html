@@ -14,7 +14,8 @@ button{padding:10px;border-radius:14px;border:0;font-size:16px}
 .add{background:#ff9800;color:#fff}
 .save{background:#4caf50;color:#fff;width:100%}
 .done{background:#2196f3;color:#fff}
-.export{background:#9c27b0;color:#fff;width:100%}
+.export{margin-bottom:5px;background:#9c27b0;color:#fff;width:100%}
+.import{margin-bottom:5px; background:#ff9800;color:#fff;width:100%}
 .del{font-size:14px; background:#f44336;color:#fff}
 .edit{background:#ff9800;color:#fff}
 .queue{font-size:18px;font-weight:bold}
@@ -147,8 +148,6 @@ textarea{width:90%;border-radius:10px;padding:8px;border:1px solid #ccc; font-si
 <script>
 const KEY='tokyo_bills';
 const BASE=10;
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEButZWLcGyptlwTJfYB3FOL7oEnt7HNxpJxME2lmb1Nn_5Z9V7MPcJGFarfRkgbryjg/exec';
-
 let view='doing';
 let currentPieces=[];
 let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
@@ -347,10 +346,11 @@ function renderBills(){
 
   if(view==='done'){
   exportBox.innerHTML=`
-    <button class="export" onclick="syncToSheet()">☁️ อัปโหลดบิลขึ้น Google Sheet</button>
-<button class="export" onclick="exportExcel()">📤 ส่งออก Excel</button>
-<input type="date" id="pullDate">
-<button class="export" onclick="pullByDate()">📥 ดึงข้อมูลตามวัน</button>
+<input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+<button class="import" onclick="document.getElementById('importExcel').click()">
+  📥 นำเข้า Excel
+</button>
+    <button class="export" onclick="exportExcel()">📤 ส่งออก Excel</button>
     <button class="del" style="width:100%;margin-top:10px" onclick="clearDoneBills()">
       🗑️ ล้างบิลที่เสร็จแล้ว
     </button>
@@ -359,6 +359,52 @@ function renderBills(){
 }else{
   todayTotal.innerHTML='';
 }
+}
+
+function importExcel(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data,{type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{header:1});
+
+    rows.shift(); // ลบหัวตาราง
+
+    let bills = {};
+    rows.forEach(r=>{
+      const [date,billNo,items,price,note] = r;
+      if(!billNo) return;
+
+      if(!bills[billNo]){
+        bills[billNo]={
+          billNo:Number(billNo),
+          date,
+          time:'',
+          status:'done',
+          note:note||'',
+          pieces:[]
+        };
+      }
+
+      bills[billNo].pieces.push({
+        items: String(items).split('+'),
+        price: Number(price)
+      });
+    });
+
+    // รวมกับของเดิม (ไม่ทับ)
+    const old = loadBills();
+    const merged = [...old.filter(b=>!bills[b.billNo]), ...Object.values(bills)];
+
+    saveBills(merged);
+    renderBills();
+    showToast('นำเข้าไฟล์เรียบร้อย 📥','success');
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function exportExcel(){
@@ -374,54 +420,6 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,ws,'orders');
   XLSX.writeFile(wb,'tokyo_orders.xlsx');
 }
-
-function pullByDate(){
-  const d = document.getElementById('pullDate').value;
-  if(!d) return showToast('เลือกวันที่ก่อนนะ','error');
-
-  if(!confirm(`จะดึงข้อมูลวันที่ ${d} มาแทนข้อมูลในเครื่อง`)) return;
-
-  fetch(`${SCRIPT_URL}?action=pull&date=${d}`)
-    .then(r=>r.json())
-    .then(data=>{
-      localStorage.setItem(KEY,JSON.stringify(data));
-
-      const maxNo = data.reduce((m,b)=>Math.max(m,b.billNo),0);
-      billCounter = maxNo + 1;
-      localStorage.setItem('billCounter',billCounter);
-
-      showToast('ดึงข้อมูลสำเร็จ 📅','success');
-      renderBills();
-    })
-    .catch(()=>{
-      showToast('ดึงข้อมูลไม่สำเร็จ ❌','error');
-    });
-}
-
-function syncToSheet(){
-  const bills = loadBills();
-  if(!bills.length){
-    showToast('ไม่มีบิลให้ซิงค์','error');
-    return;
-  }
-
-  fetch(SCRIPT_URL,{
-    method:'POST',
-    body: JSON.stringify({
-      action:'sync',
-      bills,
-      billCounter
-    })
-  })
-  .then(r=>r.text())
-  .then(()=>{
-    showToast('อัปโหลดขึ้น Sheet แล้ว ☁️','success');
-  })
-  .catch(()=>{
-    showToast('เชื่อมต่อไม่สำเร็จ 😵','error');
-  });
-}
-
 
 function clearDoneBills(){
   if(!confirm('ยืนยันล้างบิลที่เสร็จแล้วทั้งหมด?\nระบบจะส่งออก Excel ก่อนลบ')) return;
