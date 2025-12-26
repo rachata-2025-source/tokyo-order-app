@@ -11,7 +11,7 @@
 body{font-family:sans-serif;background:#F5E3CB;margin-bottom:20px; padding:12px;}
 .card{background:#fff;padding:12px;border-radius:14px;margin-bottom:10px;}
 button{padding:10px;border-radius:14px;border:0;font-size:16px}
-.add{background:#ff9800;color:#fff}
+.add{margin:6px; background:#ff9800;color:#fff }
 .save{background:#4caf50;color:#fff;width:100%}
 .done{background:#2196f3;color:#fff}
 .export{margin-bottom:5px;background:#9c27b0;color:#fff;width:100%}
@@ -30,7 +30,7 @@ button{padding:10px;border-radius:14px;border:0;font-size:16px}
 .note{font-size:16px;color:#555;margin-top:2px}
 
 input[type="number"]{width:80px;text-align:center;}
-textarea{width:90%;border-radius:10px;padding:8px;border:1px solid #ccc; font-size:18px;}
+textarea{width:90%; border-radius:10px;padding:8px;border:1px solid #ccc; font-size:18px;}
 
 .fillings{
   display:grid;
@@ -128,18 +128,21 @@ textarea{width:90%;border-radius:10px;padding:8px;border:1px solid #ccc; font-si
 <body>
 
 <div class="card fillings" id="fillingsBox"></div>
-<div style="display:flex;gap:8px;align-items:center">
+<div style="display:flex;gap:6px;align-items:center">
+  <button onclick="changeQty(-1)">−</button>
   <input type="number" id="pieceQty" value="1" min="1"
-         style="width:70px;text-align:center;font-size:18px">
+    style="width:40px;text-align:center;font-size:18px">
+  <button onclick="changeQty(1)">＋</button>
   <button class="add" onclick="addPiece()">➕ เพิ่มลงบิล</button>
 </div>
 
-<h2>บิลปัจจุบัน</h2>
+
+<h3>บิลปัจจุบัน</h3>
 <div id="currentBill"></div>
 
 <div class="card">
   <b>หมายเหตุบิล</b>
-  <textarea id="billNote"></textarea>
+  <textarea id="billNote" style="height:24px"></textarea>
 </div>
 
 <button class="save" onclick="saveBill()">💾 บันทึกบิล</button>
@@ -217,6 +220,14 @@ function addPiece(){
   document.getElementById('pieceQty').value = 1;
   document.querySelectorAll('#fillingsBox input').forEach(c=>c.checked=false);
   renderCurrent();
+}
+
+function changeQty(step){
+  const input = document.getElementById('pieceQty');
+  let v = parseInt(input.value) || 1;
+  v += step;
+  if(v < 1) v = 1;
+  input.value = v;
 }
 
 function renderCurrent(){
