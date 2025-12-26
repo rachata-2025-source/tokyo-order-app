@@ -348,10 +348,26 @@ function hideToast(){
 
 
 function renderTodayTotal(){
-  const today=new Date().toISOString().slice(0,10);
-  const bills=loadBills().filter(b=>b.status==='done'&&b.date===today);
-  const sum=bills.reduce((s,b)=>s+b.pieces.reduce((a,p)=>a+p.price,0),0);
-  todayTotal.innerHTML=`<b>ยอดวันนี้:</b> ${sum} บาท<br><b>จำนวนบิล:</b> ${bills.length} บิล`;
+  const today = new Date().toISOString().slice(0,10);
+
+  const bills = loadBills().filter(
+    b => b.status === 'done' && b.date === today
+  );
+
+  let totalMoney = 0;
+  let totalBills = bills.length;
+
+  bills.forEach(b=>{
+    b.pieces.forEach(p=>{
+      const qty = p.qty || 1;
+      totalMoney += p.price * qty;
+    });
+  });
+
+  todayTotal.innerHTML = `
+    <b>ยอดวันนี้:</b> ${totalMoney} บาท<br>
+    <b>จำนวนบิล:</b> ${totalBills} บิล
+  `;
 }
 
 function renderBills(){
