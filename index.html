@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ระบบรับออเดอร์ขนมโตเกียว</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+body{font-family:sans-serif;background:#F5E3CB;margin:0;padding:12px;}
+.card{background:#fff;padding:12px;border-radius:14px;margin-bottom:10px;}
+button{padding:10px;border-radius:14px;border:0;font-size:16px}
+.add{background:#ff9800;color:#fff}
+.save{background:#4caf50;color:#fff;width:100%}
+.done{background:#2196f3;color:#fff}
+.export{background:#9c27b0;color:#fff;width:100%}
+.del{font-size:14px; background:#f44336;color:#fff}
+.edit{background:#ff9800;color:#fff}
+.queue{font-size:18px;font-weight:bold}
+.tab{display:flex;gap:6px;margin:12px 0}
+.tab button{flex:1;background:#ddd}
+.tab button.active{
+  background:#4caf50;
+  color:#fff;
+  font-weight:bold;
+}
+.price{font-weight:bold;margin-top:6px}
+.note{font-size:16px;color:#555;margin-top:2px}
+
+input[type="number"]{width:80px;text-align:center;}
+textarea{width:90%;border-radius:10px;padding:8px;border:1px solid #ccc; font-size:18px;}
+
+.fillings{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+.fillings label{
+  display:block;
+  background:#ffe0b2;
+  padding:10px;
+  border-radius:12px;
+  text-align:center;
+  font-weight:bold;
+}
+.fillings input{display:none;}
+.fillings input:checked + span{
+  background:#ff9800;
+  color:#fff;
+  display:block;
+  padding:10px;
+  border-radius:12px;
+}
+
+/* เลขบิล + เวลา เล็กลง */
+.queue{
+  font-size:14px;
+  font-weight:bold;
+  color:#555;
+}
+
+/* กล่องสรุปราคา ชิดขวา */
+.bill-summary{
+  text-align:right;
+  font-size:18px;
+  font-weight:bold;
+}
+/* ไส้ที่สั่ง ให้เด่น */
+.bill-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+ font-size:28px;
+  font-weight:bold;
+  margin:6px 0;
+}
+
+.item-name{
+  font-size:28px;   /* 🔥 ไส้ใหญ่จริง */
+  font-weight:bold;
+}
+
+.item-price{
+  font-size:16px;   /* ราคาเล็กกว่า */
+}
+/*แจ้งเตือน*/
+.toast{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#333;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:20px;
+  font-size:16px;
+  opacity:0;
+  pointer-events:none;
+  transition:.4s;
+  z-index:999;
+}
+.toast.show{opacity:1; pointer-events:auto;}
+
+.toast.success{background:#4caf50}
+.toast.error{background:#f44336}
+.toast.info{background:#2196f3}
+
+.toast button{
+  margin:0 6px;
+  padding:6px 14px;
+  border-radius:12px;
+  border:0;
+  font-size:14px;
+}
+.toast .ok{background:#4caf50;color:#fff}
+.toast .cancel{background:#777;color:#fff}
+
+
+</style>
+</head>
+
+<body>
+
+<div class="card fillings" id="fillingsBox"></div>
+<button class="add" onclick="addPiece()">➕ เพิ่มลงบิล</button>
+
+<h2>บิลปัจจุบัน</h2>
+<div id="currentBill"></div>
+
+<div class="card">
+  <b>หมายเหตุบิล</b>
+  <textarea id="billNote"></textarea>
+</div>
+
+<button class="save" onclick="saveBill()">💾 บันทึกบิล</button>
+
+<div class="tab">
+  <button id="tabDoing" onclick="view='doing';activeBillNo=null;renderBills()">กำลังทำ</button>
+  <button id="tabDone" onclick="view='done';activeBillNo=null;renderBills()">เสร็จแล้ว</button>
+</div>
+
+<div id="todayTotal" class="card"></div>
+<div id="billList"></div>
+<div id="exportBox"></div>
+
+<script>
+const KEY='tokyo_bills';
+const BASE=10;
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEButZWLcGyptlwTJfYB3FOL7oEnt7HNxpJxME2lmb1Nn_5Z9V7MPcJGFarfRkgbryjg/exec';
+
+let view='doing';
+let currentPieces=[];
+let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
+let activeBillNo=null;
+let editingBillNo=null;
+
+const fillings=[
+'หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','ซอสไข่กุ้ง','ซอสชีส','ใบเตย','สตรอเบอรี่','ครีมข้าวโพด','พิซซ่า',
+'นูเทลล่า','ฝอยทอง','ไข่'
+];
+
+function loadBills(){return JSON.parse(localStorage.getItem(KEY)||'[]');}
+function saveBills(b){localStorage.setItem(KEY,JSON.stringify(b));}
+
+fillingsBox.innerHTML=fillings.map(f=>`
+<label><input type="checkbox" value="${f}"><span>${f}</span></label>
+`).join('');
+
+function calcPrice(items){
+  let price = BASE; // 10
+
+  // คู่พิเศษ
+  if(items.includes('นูเทลล่า') && items.includes('ฝอยทอง')){
+    price = 15;
+  }
+
+  // ของเพิ่ม
+  if(items.includes('ไข่')) price += 5;
+  if(items.includes('ซอสไข่กุ้ง')) price += 5;
+
+  return price;
+}
+
+function addPiece(){
+  const items=[...document.querySelectorAll('#fillingsBox input:checked')].map(i=>i.value);
+  if(!items.length) return showToast('เลือกไส้ก่อนนะ 😅','error');
+  currentPieces.push({items,price:calcPrice(items)});
+  document.querySelectorAll('#fillingsBox input').forEach(c=>c.checked=false);
+  renderCurrent();
+}
+
+function renderCurrent(){
+  currentBill.innerHTML='';
+  let total=0;
+  currentPieces.forEach((p,i)=>{
+    total+=p.price;
+    currentBill.innerHTML+=`
+      <div class="card">
+        ชิ้น ${i+1}: ${p.items.join(' + ')}<br>
+        ราคา <input type="number" value="${p.price}" onchange="pUpdate(${i},this.value)"> บาท
+        <button class="del" onclick="pDel(${i})">ลบ</button>
+      </div>`;
+  });
+  currentBill.innerHTML+=`<div class="price">รวม ${total} บาท</div>`;
+}
+
+function pUpdate(i,v){currentPieces[i].price=parseInt(v)||0;renderCurrent();}
+function pDel(i){currentPieces.splice(i,1);renderCurrent();}
+
+function saveBill(){
+  if(!currentPieces.length) return;
+  const bills=loadBills();
+const isEdit = editingBillNo !== null;
+
+
+  if(editingBillNo!==null){
+    const b=bills.find(x=>x.billNo===editingBillNo);
+    if(!b) return;
+    b.pieces=currentPieces;
+    b.note=billNote.value;
+    editingBillNo=null;
+  }else{
+    bills.push({
+      billNo:billCounter,
+      date:new Date().toISOString().slice(0,10),
+      time:new Date().toLocaleTimeString(),
+      pieces:currentPieces,
+      note:billNote.value,
+      status:'doing'
+    });
+    billCounter++;
+    localStorage.setItem('billCounter',billCounter);
+  }
+
+  saveBills(bills);
+  currentPieces=[];
+  billNote.value='';
+  renderCurrent();
+showToast(
+  isEdit ? 'แก้ไขบิลเรียบร้อย ✏️' : 'บันทึกบิลแล้ว ✔️',
+  'success'
+);
+
+  renderBills();
+}
+
+function editBill(no){
+  const bills=loadBills();
+  const b=bills.find(x=>x.billNo===no);
+  if(!b) return;
+  currentPieces=JSON.parse(JSON.stringify(b.pieces));
+  billNote.value=b.note||'';
+  editingBillNo=no;
+  view='doing';
+  activeBillNo=null;
+  renderCurrent();
+  renderBills();
+  showToast(`กำลังแก้ไขบิล #${no}`);
+}
+
+function finishBill(no){
+  const bills=loadBills();
+  const b=bills.find(x=>x.billNo===no);
+  if(!b) return;
+
+  b.status='done';
+  saveBills(bills);
+
+  activeBillNo=null;
+  renderBills();
+
+  showToast(`บิล #${no} เสร็จแล้ว ✅`,'success');
+}
+
+
+function selectBill(no){
+  activeBillNo = activeBillNo===no ? null : no;
+  renderBills();
+}
+
+function deleteBill(no){
+  showConfirm(
+    `ลบบิล #${no} ใช่ไหม? 🗑️`,
+    () => {
+      saveBills(loadBills().filter(b=>b.billNo!==no));
+      activeBillNo=null;
+      renderBills();
+      showToast('ลบบิลแล้ว','success');
+    }
+  );
+}
+
+function confirmToast(msg,yes){
+  const t=document.getElementById('toast');
+  t.className='toast show info';
+  t.innerHTML=`
+  <div style="margin-bottom:10px">${msg}</div>
+  <button class="ok" onclick="yes();hideToast()">ตกลง</button>
+  <button class="cancel" onclick="hideToast()">ยกเลิก</button>
+`;
+}
+
+function hideToast(){
+  document.getElementById('toast').className='toast';
+}
+
+
+function renderTodayTotal(){
+  const today=new Date().toISOString().slice(0,10);
+  const bills=loadBills().filter(b=>b.status==='done'&&b.date===today);
+  const sum=bills.reduce((s,b)=>s+b.pieces.reduce((a,p)=>a+p.price,0),0);
+  todayTotal.innerHTML=`<b>ยอดวันนี้:</b> ${sum} บาท<br><b>จำนวนบิล:</b> ${bills.length} บิล`;
+}
+
+function renderBills(){
+  tabDoing.classList.toggle('active',view==='doing');
+  tabDone.classList.toggle('active',view==='done');
+
+  billList.innerHTML='';
+  exportBox.innerHTML='';
+
+  loadBills().filter(b=>b.status===view).forEach(b=>{
+    const sum=b.pieces.reduce((s,p)=>s+p.price,0);
+    const active=activeBillNo===b.billNo;
+    billList.innerHTML+=`
+      <div class="card" onclick="selectBill(${b.billNo})">
+        <div class="queue">บิล #${b.billNo} (${b.time})</div>
+        <div class="bill-items">
+  ${b.pieces.map(p=>`
+    <div class="bill-item">
+      <span class="item-name">${p.items.join(' + ')}</span>
+      <span class="item-price">${p.price}฿</span>
+    </div>
+  `).join('')}
+</div>
+        ${b.note?`<div class="note">📝 ${b.note}</div>`:''}
+        <div class="price">รวม ${sum} บาท</div>
+        ${active?`
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="edit" onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
+          <button class="del" onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
+          ${b.status==='doing'?`<button class="done" onclick="finishBill(${b.billNo});event.stopPropagation()">เสร็จแล้ว</button>`:''}
+        </div>`:''}
+      </div>`;
+  });
+
+  if(view==='done'){
+  exportBox.innerHTML=`
+    <button class="export" onclick="syncToSheet()">☁️ อัปโหลดบิลขึ้น Google Sheet</button>
+<button class="export" onclick="exportExcel()">📤 ส่งออก Excel</button>
+<input type="date" id="pullDate">
+<button class="export" onclick="pullByDate()">📥 ดึงข้อมูลตามวัน</button>
+    <button class="del" style="width:100%;margin-top:10px" onclick="clearDoneBills()">
+      🗑️ ล้างบิลที่เสร็จแล้ว
+    </button>
+  `;
+  renderTodayTotal();
+}else{
+  todayTotal.innerHTML='';
+}
+}
+
+function exportExcel(){
+  const bills=loadBills().filter(b=>b.status==='done');
+  const rows=[['วันที่','เลขบิล','ไส้','ราคา','หมายเหตุ']];
+  bills.forEach(b=>{
+    b.pieces.forEach(p=>{
+      rows.push([b.date,b.billNo,p.items.join('+'),p.price,b.note||'']);
+    });
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'orders');
+  XLSX.writeFile(wb,'tokyo_orders.xlsx');
+}
+
+function pullByDate(){
+  const d = document.getElementById('pullDate').value;
+  if(!d) return showToast('เลือกวันที่ก่อนนะ','error');
+
+  if(!confirm(`จะดึงข้อมูลวันที่ ${d} มาแทนข้อมูลในเครื่อง`)) return;
+
+  fetch(`${SCRIPT_URL}?action=pull&date=${d}`)
+    .then(r=>r.json())
+    .then(data=>{
+      localStorage.setItem(KEY,JSON.stringify(data));
+
+      const maxNo = data.reduce((m,b)=>Math.max(m,b.billNo),0);
+      billCounter = maxNo + 1;
+      localStorage.setItem('billCounter',billCounter);
+
+      showToast('ดึงข้อมูลสำเร็จ 📅','success');
+      renderBills();
+    })
+    .catch(()=>{
+      showToast('ดึงข้อมูลไม่สำเร็จ ❌','error');
+    });
+}
+
+function syncToSheet(){
+  const bills = loadBills();
+  if(!bills.length){
+    showToast('ไม่มีบิลให้ซิงค์','error');
+    return;
+  }
+
+  fetch(SCRIPT_URL,{
+    method:'POST',
+    body: JSON.stringify({
+      action:'sync',
+      bills,
+      billCounter
+    })
+  })
+  .then(r=>r.text())
+  .then(()=>{
+    showToast('อัปโหลดขึ้น Sheet แล้ว ☁️','success');
+  })
+  .catch(()=>{
+    showToast('เชื่อมต่อไม่สำเร็จ 😵','error');
+  });
+}
+
+
+function clearDoneBills(){
+  if(!confirm('ยืนยันล้างบิลที่เสร็จแล้วทั้งหมด?\nระบบจะส่งออก Excel ก่อนลบ')) return;
+
+  exportExcel();
+
+  let bills = loadBills().filter(b=>b.status!=='done');
+
+  // ถ้าไม่เหลือบิลเลย รีเซ็ตเลขคิว
+  if(bills.length===0){
+    billCounter=1;
+    localStorage.setItem('billCounter','1');
+  }
+
+  saveBills(bills);
+  showToast('ล้างบิลเรียบร้อย 🧹','success');
+  renderBills();
+}
+
+renderBills();
+
+function showToast(msg,type='info'){
+  const t=document.getElementById('toast');
+  t.className='toast show '+type;
+  t.innerText=msg;
+  setTimeout(()=>t.className='toast',2000);
+}
+function showConfirm(msg, onOk){
+  const t=document.getElementById('toast');
+  t.className='toast show';
+  t.innerHTML=`
+    <div>${msg}</div>
+    <div class="toast-actions">
+      <button onclick="confirmOk()">ตกลง</button>
+      <button onclick="hideToast()">ยกเลิก</button>
+    </div>
+  `;
+  window._confirmOk = onOk;
+}
+
+function confirmOk(){
+  if(window._confirmOk) window._confirmOk();
+  hideToast();
+}
+
+function hideToast(){
+  const t=document.getElementById('toast');
+  t.className='toast';
+  t.innerHTML='';
+}
+
+
+</script>
+<div id="toast" class="toast"></div>
+</body>
+</html>
