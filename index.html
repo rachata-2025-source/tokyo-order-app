@@ -525,7 +525,7 @@ function importExcel(input){
 
     let bills = {};
     rows.forEach(r=>{
-      const [date,billNo,items,price,note] = r;
+      const [date,billNo,items,qty,pricePerPiece,total,note] = r;
       if(!billNo) return;
 
       if(!bills[billNo]){
@@ -539,10 +539,11 @@ function importExcel(input){
   };
 }
 
-      bills[billNo].pieces.push({
-        items: String(items).split('+'),
-        price: Number(price)
-      });
+     bills[billNo].pieces.push({
+  items: String(items).split('+'),
+  qty: Number(qty) || 1,
+  price: Number(pricePerPiece) || 0
+});
     });
 
     // รวมกับของเดิม (ไม่ทับ)
@@ -566,10 +567,19 @@ function syncBillCounter(){
 
 function exportExcel(){
   const bills=loadBills().filter(b=>b.status==='done');
-  const rows=[['วันที่','เลขบิล','ไส้','ราคา','หมายเหตุ']];
+  const rows=[['วันที่','เลขบิล','ไส้','จำนวน','ราคาต่อชิ้น','รวม','หมายเหตุ']];
   bills.forEach(b=>{
     b.pieces.forEach(p=>{
-      rows.push([b.date,b.billNo,p.items.join('+'),p.price,b.note||'']);
+      const qty = p.qty || 1;
+rows.push([
+  b.date,
+  b.billNo,
+  p.items.join('+'),
+  qty,
+  p.price,
+  p.price * qty,
+  b.note || ''
+]);
     });
   });
   const ws=XLSX.utils.aoa_to_sheet(rows);
