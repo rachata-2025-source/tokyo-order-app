@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-body{font-family:sans-serif;background:#F5E3CB;margin-bottom:20px; padding:12px;}
+body{font-family:sans-serif;background:#F5E3CB;margin-bottom:30px; padding:12px;}
 .card{background:#fff;padding:12px;border-radius:14px;margin-bottom:10px;}
 button{padding:10px;border-radius:14px;border:0;font-size:16px}
 .add{margin:6px; background:#ff9800;color:#fff }
@@ -26,8 +26,13 @@ button{padding:10px;border-radius:14px;border:0;font-size:16px}
   color:#fff;
   font-weight:bold;
 }
-.price{font-weight:bold;margin-top:6px}
-.note{font-size:16px;color:#555;margin-top:2px}
+.price{
+  font-size:20px;            /* ใหญ่กว่ารายการ */
+  font-weight:bold;
+  color:#ff5722;
+  white-space:nowrap;
+}
+.note{font-size:18px;color:#555;margin-top:4px}
 
 input[type="number"]{width:80px;text-align:center;}
 textarea{width:90%; border-radius:10px;padding:8px;border:1px solid #ccc; font-size:18px;}
@@ -121,6 +126,15 @@ textarea{width:90%; border-radius:10px;padding:8px;border:1px solid #ccc; font-s
   color:#fff;
   font-weight:bold;
 }
+.queue-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:6px 10px;
+  margin-bottom:6px;
+  background:#fff7e6;        /* พื้นหลังจางๆ */
+  border-radius:8px;
+}
 
 </style>
 </head>
@@ -138,6 +152,12 @@ textarea{width:90%; border-radius:10px;padding:8px;border:1px solid #ccc; font-s
 
 
 <h3>บิลปัจจุบัน</h3>
+<div id="editHint"
+     style="margin-bottom:8px;
+            font-weight:bold;
+            color:#ff5722;
+            text-align:center">
+</div>
 <div id="currentBill"></div>
 
 <div class="card">
@@ -237,10 +257,20 @@ function renderCurrent(){
     total += p.price * (p.qty || 1);
     currentBill.innerHTML+=`
       <div class="card">
-       ${p.items.join(' + ')} × ${p.qty || 1}<br>
+       ${p.items.join(' + ')}
+ <button onclick="pQty(${i},-1)">−</button>
+  <strong>${p.qty || 1}</strong>
+  <button onclick="pQty(${i},1)">+</button>
+ ชิ้น
+<br>
+
 ราคาต่อชิ้น 
-<input type="number" value="${p.price}" onchange="pUpdate(${i},this.value)"> บาท
-        <button class="del" onclick="pDel(${i})">ลบ</button>
+<input type="number" value="${p.price}"
+       onchange="pUpdate(${i},this.value)"> บาท
+
+
+<button class="del" onclick="pDel(${i})">ลบ</button>
+
       </div>`;
   });
   currentBill.innerHTML+=`<div class="price">รวม ${total} บาท</div>`;
@@ -248,6 +278,19 @@ function renderCurrent(){
 
 function pUpdate(i,v){currentPieces[i].price=parseInt(v)||0;renderCurrent();}
 function pDel(i){currentPieces.splice(i,1);renderCurrent();}
+/*ฟังก์ชันควบคุม qty*/
+function pQty(i,delta){
+  if(!currentPieces[i]) return;
+
+  currentPieces[i].qty = (currentPieces[i].qty || 1) + delta;
+
+  if(currentPieces[i].qty <= 0){
+    currentPieces.splice(i,1);
+  }
+
+  renderCurrent();
+}
+
 
 function saveBill(){
   if(!currentPieces.length) return;
@@ -293,11 +336,13 @@ function editBill(no){
   currentPieces=JSON.parse(JSON.stringify(b.pieces));
   billNote.value=b.note||'';
   editingBillNo=no;
+
   view='doing';
   activeBillNo=null;
   renderCurrent();
   renderBills();
   showToast(`กำลังแก้ไขบิล #${no}`);
+
 }
 
 function finishBill(no){
@@ -371,6 +416,13 @@ function renderTodayTotal(){
 }
 
 function renderBills(){
+const editHint = document.getElementById('editHint');
+if(editingBillNo !== null){
+  editHint.innerText = `✏️ กำลังแก้ไขบิล #${editingBillNo}`;
+}else{
+  editHint.innerText = '';
+}
+
   tabDoing.classList.toggle('active',view==='doing');
   tabDone.classList.toggle('active',view==='done');
 tabSummary.classList.toggle('active', view==='summary');
@@ -384,7 +436,10 @@ summaryBox.innerHTML = '';
     const active=activeBillNo===b.billNo;
     billList.innerHTML+=`
       <div class="card" onclick="selectBill(${b.billNo})">
-        <div class="queue">บิล #${b.billNo} (${b.time})</div>
+        <div class="queue-row">
+  <div class="queue">บิล #${b.billNo} (${b.time})</div>
+  <div class="price">ทั้งหมด ${sum} บาท</div>
+</div>
         <div class="bill-items">
   ${b.pieces.map(p=>`
     <div class="bill-item">
@@ -394,7 +449,7 @@ summaryBox.innerHTML = '';
   `).join('')}
 </div>
         ${b.note?`<div class="note">📝 ${b.note}</div>`:''}
-        <div class="price">รวม ${sum} บาท</div>
+    
         ${active?`
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="edit" onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
@@ -440,6 +495,7 @@ function renderSummary(){
 
   let totalMoney = 0;
   let totalBills = bills.length;
+  let totalPieces = 0;
   let itemMap = {};
 
   bills.forEach(b=>{
@@ -447,6 +503,7 @@ function renderSummary(){
       const qty = p.qty || 1;
       const key = p.items.join(' + ');
       totalMoney += p.price * qty;
+      totalPieces += qty;
 
       if(!itemMap[key]){
         itemMap[key] = { qty:0, money:0 };
@@ -472,13 +529,18 @@ let html = `
     <span>จำนวนบิลทั้งหมด</span>
     <span>${totalBills} บิล</span>
   </div>
-
+<div style="display:flex;justify-content:space-between;
+            font-weight:bold;margin-bottom:10px">
+  <span>จำนวนชิ้นทั้งหมด</span>
+  <span>${totalPieces} ชิ้น</span>
+</div>
   <div style="display:flex;justify-content:space-between;
               font-weight:bold;border-bottom:1px dashed #ccc;
               padding-bottom:6px;margin-bottom:10px">
     <span>ยอดขายทั้งหมด</span>
     <span>${totalMoney} ฿</span>
   </div>
+
 `;
 const sortedItems = Object.entries(itemMap)
   .sort((a,b)=> b[1].qty - a[1].qty);
@@ -733,7 +795,6 @@ async function closeShop(){
     showToast('ปิดร้านไม่สำเร็จ ❌','error');
   }
 }
-
 
 </script>
 <div id="toast" class="toast"></div>
