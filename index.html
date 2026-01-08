@@ -296,13 +296,13 @@ function renderBills(){
         billList.innerHTML+=`
             <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
-                    <span style="font-size:0.85rem; color:#888;">#${b.billNo} • ${b.time}</span>
+                    <span style="font-size:0.9rem; color:#888;">#${b.billNo} • ${b.time}</span>
                     <b style="color:var(--primary); font-size:1.1rem;">${sum}.-</b>
                 </div>
-                <div style="font-size:1rem; line-height:1.7;">
-                    ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:0.8rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
+                <div style="font-size:1.6rem; line-height:1.7;">
+                    ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
                 </div>
-                ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:0.85rem;">📝 ${b.note}</div>`:''}
+                ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1rem;">📝 ${b.note}</div>`:''}
                 ${active?`<div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
                     <button class="btn btn-outline btn-sm" style="flex:1" onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
                     <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;" onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
@@ -385,8 +385,8 @@ let html = `<div class="card" id="summaryPrint" style="padding:20px;">
         </div>`;
     });
     html += `</div><div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 Excel</button>
-        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ เซฟรูป</button>
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 ส่งออกExcel</button>
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ ส่งออกรูปภาพ</button>
     </div>`;
     summaryBox.innerHTML = html;
 }
