@@ -80,11 +80,76 @@
     background-color: var(--success) !important;
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); /* เพิ่มเงาให้ดูน่ากด */
 }
+/* ปุ่มโหมดมืด */
+.dark-toggle {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: #333;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 3000;
+}
+/* ===== DARK MODE ===== */
+body.dark {
+    --bg: #121212;
+    --primary: #FFB74D;
+    --primary-dark: #FFA726;
+    --secondary: #64B5F6;
+    --success: #66BB6A;
+    --danger: #EF5350;
+}
+body.dark {
+    background-color: var(--bg);
+    color: #eee;
+}
+body.dark .card {
+    background: #1E1E1E;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+body.dark .section-title {
+    color: #aaa;
+}
+body.dark .fillings-grid span {
+    background: #2A2A2A;
+    color: #ddd;
+}
+body.dark .fillings-grid input:checked + span {
+    background: #3A2A1A;
+}
+body.dark .tabs {
+    background: #2A2A2A;
+}
+body.dark .tab.active {
+    background: #1E1E1E;
+}
+body.dark .btn-outline {
+    background: #1E1E1E;
+    color: #ddd;
+    border-color: #333;
+}
+
+body.dark .price-input-group {
+    background: #2A2A2A;
+}
+
+body.dark .toast {
+    background: #000;
+}
+
     </style>
 </head>
 <body>
 
 <div class="container">
+<button id="darkToggle" class="dark-toggle">🌙</button>
+
     <div class="card" style="padding-bottom:12px;">
         <span class="section-title">เลือกไส้มาตรฐาน</span>
         <div class="fillings-grid" id="fillingsBox"></div>
@@ -266,7 +331,8 @@ function saveBill(){
             time: new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
             pieces: JSON.parse(JSON.stringify(currentPieces)), 
             note: noteEl.value, 
-            status: 'doing'
+            status: 'doing',
+    paid: false   // 👈 เพิ่มบรรทัดนี้
         });
         localStorage.setItem('billCounter', billCounter);
     }
@@ -305,17 +371,37 @@ const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
             <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
                     <span style="font-size:0.9rem; color:#888;">#${b.billNo} • ${b.time}  • ${qtySum} ชิ้น</span>
+${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
                     <b style="color:var(--primary); font-size:1.3rem;">${sum}.-</b>
                 </div>
                 <div style="font-size:1.8rem; line-height:1.7;">
                     ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
                 </div>
                 ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1.2rem;">📝 ${b.note}</div>`:''}
-                ${active?`<div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
-                    <button class="btn btn-outline btn-sm" style="flex:1" onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;" onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
-                    ${b.status==='doing'?`<button class="btn btn-finish-large" style="flex:3" onclick="finishBill(${b.billNo});event.stopPropagation()">✅ เสร็จแล้ว</button>`:''}
-                </div>`:''}
+                ${active?`
+<div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
+    
+    <button class="btn btn-outline btn-sm" style="flex:1"
+        onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
+
+    <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;"
+        onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
+
+    ${b.status==='doing'?`
+        ${(view==='doing' && b.status==='doing') ? `
+    <button class="btn btn-sm"
+        style="flex:2; background:${b.paid?'#d4edda':'#fff3cd'};"
+        onclick="togglePaid(${b.billNo});event.stopPropagation()">
+        ${b.paid?'✅ จ่ายแล้ว':'💸 ยังไม่จ่าย'}
+    </button>
+` : ''}
+
+
+        <button class="btn btn-finish-large" style="flex:3"
+            onclick="finishBill(${b.billNo});event.stopPropagation()">✅ เสร็จแล้ว</button>
+    `:''}
+
+</div>`:''}
             </div>`;
     });
 
@@ -338,8 +424,8 @@ function renderTodayTotal(){
     bills.forEach(b=> b.pieces.forEach(p=> totalMoney += parseInt(p.price) * (p.qty || 1)));
     document.getElementById('todayTotal').innerHTML = `
         <div style="display:flex; gap:0px; margin-bottom:0px;">
-            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">บิลวันนี้</small><br><b>${bills.length}</b></div>
-            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">รวมเงิน</small><br><b style="color:var(--success)">${totalMoney}.-</b></div>
+            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">บิลวันนี้</small><b>${bills.length}</b></div>
+            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">รวมเงิน</small><b style="color:var(--success)">${totalMoney}.-</b></div>
         </div>`;
 }
 
@@ -520,6 +606,23 @@ function closeShop(){
         location.reload(); 
     } 
 }
+function togglePaid(no){
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const b = bills.find(x => x.billNo === no);
+    if(!b) return;
+
+    b.paid = !b.paid;
+    localStorage.setItem(KEY, JSON.stringify(bills));
+    renderBills();
+}
+const toggleBtn = document.getElementById('darkToggle');
+
+toggleBtn.onclick = () => {
+    document.body.classList.toggle('dark');
+
+    toggleBtn.textContent =
+        document.body.classList.contains('dark') ? '☀️' : '🌙';
+};
 
 // Initial Render
 renderBills(); 
