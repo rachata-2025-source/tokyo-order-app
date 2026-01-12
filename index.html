@@ -16,8 +16,8 @@
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; }
-        .container { max-width: 95%; margin: 0 auto; }
-        .card { background: #fff; border-radius: var(--border-radius); padding: 18px; margin-bottom: 12px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
+        .container { max-width: 98%; margin: 0 auto; }
+        .card { background: #fff; border-radius: var(--border-radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
         .section-title { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; font-weight: 600; }
         
         /* Fillings Grid */
@@ -33,7 +33,7 @@
 .fillings-grid span {
     display: block;
     background: #f0f0f0;
-    padding: 15px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    padding: 14px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
     border-radius: 12px;
     text-align: center;
     font-size: 1rem; /* เพิ่มขนาดตัวอักษรจาก 0.85 เป็น 1rem */
@@ -75,8 +75,8 @@
 /* ปรับปุ่มเสร็จแล้วให้เด่นและใหญ่ขึ้น */
 .btn-finish-large {
     flex: 3 !important; /* ให้กว้างกว่าปุ่มแก้ไขและลบ */
-    font-size: 1.1rem !important; /* ขยายตัวอักษร */
-    padding: 12px !important; /* เพิ่มความหนาของปุ่ม */
+    font-size: 1rem !important; /* ขยายตัวอักษร */
+    padding: 10px !important; /* เพิ่มความหนาของปุ่ม */
     background-color: var(--success) !important;
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); /* เพิ่มเงาให้ดูน่ากด */
 }
@@ -135,8 +135,12 @@ body.dark .btn-outline {
     border-color: #333;
 }
 
-body.dark .price-input-group {
+body.dark .price-input-group{
     background: #2A2A2A;
+
+}
+body.dark .price-input-group input {
+    color: #fff;
 }
 
 body.dark .toast {
@@ -392,7 +396,7 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
     <button class="btn btn-sm"
         style="flex:2; background:${b.paid?'#d4edda':'#fff3cd'};"
         onclick="togglePaid(${b.billNo});event.stopPropagation()">
-        ${b.paid?'✅ จ่ายแล้ว':'💸 ยังไม่จ่าย'}
+        ${b.paid?'✅ จ่ายแล้ว':'ยังไม่จ่าย'}
     </button>
 ` : ''}
 
