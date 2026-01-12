@@ -207,12 +207,14 @@ function renderCurrent(){
     const currentBillDiv = document.getElementById('currentBill');
     currentBillDiv.innerHTML='';
     let total=0;
+    let totalQty = 0;
     if(currentPieces.length === 0) {
         currentBillDiv.innerHTML = '<div style="text-align:center; color:#ccc; padding:5px; font-size:0.8rem;">ยังไม่มีรายการในบิล</div>';
     }
     currentPieces.forEach((p,i)=>{
         const lineTotal = p.price * p.qty;
         total += lineTotal;
+totalQty += p.qty || 1;
         currentBillDiv.innerHTML+=`
             <div class="current-item">
                 <div class="item-row-top">
@@ -231,6 +233,11 @@ function renderCurrent(){
                 </div>
             </div>`;
     });
+currentBillDiv.innerHTML += `
+    <div style="text-align:center; font-size:1rem; color:#666; margin-top:6px;">
+        ทั้งหมด ${totalQty} ชิ้น
+    </div>
+`;
     document.getElementById('mainSaveBtn').innerText = `💾 บันทึกและเปิดบิล (${total}.-)`;
 }
 
@@ -238,7 +245,7 @@ function pUpdate(i,v){currentPieces[i].price=parseInt(v)||0;renderCurrent();}
 function pDel(i){currentPieces.splice(i,1);renderCurrent();}
 function pQty(i,d){currentPieces[i].qty = Math.max(1, (currentPieces[i].qty||1)+d); renderCurrent();}
 
-// ฟังก์ชันบันทึกบิล (จุดที่มีปัญหา)
+// ฟังก์ชันบันทึกบิล
 function saveBill(){
     if(currentPieces.length === 0) return showToast('เพิ่มรายการก่อนบันทึกนะ','error');
     
@@ -293,16 +300,17 @@ function renderBills(){
     bills.sort((a,b) => view==='doing' ? a.billNo - b.billNo : b.billNo - a.billNo).forEach(b=>{
         const sum = b.pieces.reduce((s,p)=> s + (parseInt(p.price)*(p.qty||1)), 0);
         const active = activeBillNo === b.billNo;
+const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
         billList.innerHTML+=`
             <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
-                    <span style="font-size:0.9rem; color:#888;">#${b.billNo} • ${b.time}</span>
-                    <b style="color:var(--primary); font-size:1.1rem;">${sum}.-</b>
+                    <span style="font-size:0.9rem; color:#888;">#${b.billNo} • ${b.time}  • ${qtySum} ชิ้น</span>
+                    <b style="color:var(--primary); font-size:1.3rem;">${sum}.-</b>
                 </div>
-                <div style="font-size:1.6rem; line-height:1.7;">
+                <div style="font-size:1.8rem; line-height:1.7;">
                     ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
                 </div>
-                ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1rem;">📝 ${b.note}</div>`:''}
+                ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1.2rem;">📝 ${b.note}</div>`:''}
                 ${active?`<div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
                     <button class="btn btn-outline btn-sm" style="flex:1" onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
                     <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;" onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
@@ -329,7 +337,7 @@ function renderTodayTotal(){
     let totalMoney = 0;
     bills.forEach(b=> b.pieces.forEach(p=> totalMoney += parseInt(p.price) * (p.qty || 1)));
     document.getElementById('todayTotal').innerHTML = `
-        <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="display:flex; gap:0px; margin-bottom:0px;">
             <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">บิลวันนี้</small><br><b>${bills.length}</b></div>
             <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">รวมเงิน</small><br><b style="color:var(--success)">${totalMoney}.-</b></div>
         </div>`;
