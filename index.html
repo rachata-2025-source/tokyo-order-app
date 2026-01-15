@@ -24,8 +24,8 @@
         /* ปรับ Grid ให้รองรับปุ่มที่ใหญ่ขึ้น (ถ้าปุ่มใหญ่ไปจนเบียดกัน) */
 .fillings-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); /* ปรับขนาดขั้นต่ำจาก 80 เป็น 95 */
-    gap: 6px; /* เพิ่มระยะห่างระหว่างปุ่ม */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* ปรับขนาดขั้นต่ำจาก 80 เป็น 95 */
+    gap: 8px; /* เพิ่มระยะห่างระหว่างปุ่ม */
     margin-bottom: 15px;
 }
         .fillings-grid input { display: none; }
@@ -33,10 +33,10 @@
 .fillings-grid span {
     display: block;
     background: #f0f0f0;
-    padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    padding: 15px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
     border-radius: 12px;
     text-align: center;
-    font-size: 1rem; 
+    font-size: 1.2rem; 
     font-weight: 500; /* ทำให้ตัวหนังสือหนาขึ้นเล็กน้อย */
     transition: 0.2s;
     border: 2px solid transparent;
@@ -146,7 +146,10 @@ body.dark .price-input-group input {
 body.dark .toast {
     background: #000;
 }
-
+@media (max-width: 768px) {
+ padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    font-size: 1.2rem; 
+}
     </style>
 </head>
 <body>
@@ -216,7 +219,7 @@ let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
 let editingBillNo=null;
 
-const fillings=['หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','พิซซ่า','ซอสไข่กุ้ง','ซอสชีส','ใบเตย','สตรอเบอรี่','ครีมข้าวโพด','นูเทลล่า','ฝอยทอง','ไข่'];
+const fillings=['หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','พิซซ่า','ซอสไข่กุ้ง','สตรอเบอรี่','ใบเตย','ซอสชีส','ครีมข้าวโพด','นูเทลล่า','ฝอยทอง','ไข่'];
 
 const fillingsBox = document.getElementById('fillingsBox');
 fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
@@ -374,7 +377,7 @@ const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
         billList.innerHTML+=`
             <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
-                    <span style="font-size:0.9rem; color:#888;">#${b.billNo} • ${b.time}  • ${qtySum} ชิ้น</span>
+                    <span style="font-size:1.1rem; color:#888;">#${b.billNo} • ${b.time}  • ${qtySum} ชิ้น</span>
 ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
                     <b style="color:var(--primary); font-size:1.3rem;">${sum}.-</b>
                 </div>
@@ -519,11 +522,34 @@ function syncBillCounter(){
 }
 
 function exportExcel(){
-    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status==='done');
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b=>b.status==='done');
+
     const rows=[['วันที่','เลขบิล','ไส้','จำนวน','ราคาต่อชิ้น','รวม','หมายเหตุ']];
-    bills.forEach(b=> b.pieces.forEach(p=> rows.push([b.date, b.billNo, p.items.join('+'), p.qty, p.price, p.price*p.qty, b.note||''])));
-    const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'orders'); XLSX.writeFile(wb,`tokyo_orders.xlsx`);
+
+    bills.forEach(b =>
+        b.pieces.forEach(p =>
+            rows.push([
+                b.date,
+                b.billNo,
+                p.items.join('+'),
+                p.qty,
+                p.price,
+                p.price*p.qty,
+                b.note||''
+            ])
+        )
+    );
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'orders');
+
+    // 👉 ต่อวันที่ท้ายชื่อไฟล์
+    const today = bills[0]?.date || 'no-date';
+    XLSX.writeFile(wb, `tokyo_orders_${today}.xlsx`);
 }
+
 
 function exportSummaryExcel(){ 
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status==='done');
