@@ -219,7 +219,7 @@ let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
 let editingBillNo=null;
 
-const fillings=['หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','พิซซ่า','ซอสไข่กุ้ง','สตรอเบอรี่','ใบเตย','ซอสชีส','ครีมข้าวโพด','นูเทลล่า','ฝอยทอง','ไข่'];
+const fillings=['หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','พิซซ่า','ซอสไข่กุ้ง','สตรอเบอรี่','ใบเตย','ซอสชีส','ครีมข้าวโพด','นูเทลล่า','ฝอยทอง','ยำสาหร่าย','ไข่'];
 
 const fillingsBox = document.getElementById('fillingsBox');
 fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
@@ -235,11 +235,33 @@ function toggleCustomArea(show) {
 
 function calcPrice(items){
     let price = BASE;
+
     if(items.includes('นูเทลล่า') && items.includes('ฝอยทอง')) price = 15;
-    if(items.includes('ไข่')) price += 5;
-    if(items.includes('ซอสไข่กุ้ง')) price += 5;
+
+    const hasYum = items.includes('ยำสาหร่าย');
+    const hasEgg = items.includes('ไข่');
+    const hasRoe = items.includes('ซอสไข่กุ้ง');
+
+    if(hasEgg) price += 5;
+    if(hasRoe) price += 5;
+
+    // ✅ logic ยำสาหร่าย
+    if(hasYum){
+        // เอายำสาหร่ายออก แล้วดูว่ามีอะไรเหลือ
+        const others = items.filter(i => i !== 'ยำสาหร่าย');
+
+        // ถ้ามีอย่างอื่นที่ "ไม่ใช่" ไข่ หรือ ซอสไข่กุ้ง
+        const hasOtherExtra = others.some(i => i !== 'ไข่' && i !== 'ซอสไข่กุ้ง');
+
+        if(hasOtherExtra){
+            price += 5;
+        }
+    }
+
     return price;
 }
+
+
 
 function addPiece() {
     const items=[...document.querySelectorAll('#fillingsBox input:checked')].map(i=>i.value);
@@ -377,9 +399,14 @@ const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
         billList.innerHTML+=`
             <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
-                    <span style="font-size:1.1rem; color:#888;">#${b.billNo} • ${b.time}  • ${qtySum} ชิ้น</span>
+                    <span style="font-size:1.1rem; color:#888;">#${b.billNo} • ${b.time}  </span>
 ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
-                    <b style="color:var(--primary); font-size:1.3rem;">${sum}.-</b>
+                    <b style="color:var(--primary); font-size:1.3rem;">
+  ${qtySum} ชิ้น
+  <span style="margin:0 10px;">•</span>
+  ${sum}.-
+</b>
+
                 </div>
                 <div style="font-size:1.8rem; line-height:1.7;">
                     ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
@@ -437,17 +464,38 @@ function renderTodayTotal(){
 }
 
 function renderSummary(){
-    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status==='done');
+
+    // ✅ ดึงข้อมูลครั้งเดียวพอ
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b => b.status === 'done');
+
     const summaryBox = document.getElementById('summaryBox');
-    if(!bills.length){ summaryBox.innerHTML = '<div class="card" style="text-align:center; padding:30px; color:#ccc;">ยังไม่มีข้อมูล</div>'; return; }
-    
+
+    if(!bills.length){
+        summaryBox.innerHTML = `
+            <div class="card" style="text-align:center; padding:30px; color:#ccc;">
+                ยังไม่มีข้อมูล
+            </div>`;
+        return;
+    }
+
+    // ✅ ใช้วันที่จากข้อมูลจริง
+    const summaryDate = bills[0]?.date || '-';
+
     let totalMoney = 0, totalBills = bills.length, totalPieces = 0, itemMap = {};
+
     bills.forEach(b=>{
         b.pieces.forEach(p=>{
-            const qty = parseInt(p.qty) || 1, key = p.items.join('+'), price = parseInt(p.price);
-            totalMoney += price * qty; totalPieces += qty;
+            const qty = parseInt(p.qty) || 1;
+            const key = p.items.join('+');
+            const price = parseInt(p.price);
+
+            totalMoney += price * qty;
+            totalPieces += qty;
+
             if(!itemMap[key]) itemMap[key] = { qty:0, money:0 };
-            itemMap[key].qty += qty; itemMap[key].money += price * qty;
+            itemMap[key].qty += qty;
+            itemMap[key].money += price * qty;
         });
     });
 
@@ -456,11 +504,12 @@ function renderSummary(){
         return b[1].money - a[1].money;
     });
 
-    // เปลี่ยนโค้ดส่วนตัวแปร html ในฟังก์ชัน renderSummary() เป็นแบบนี้:
-
-let html = `<div class="card" id="summaryPrint" style="padding:20px;">
-    <h3 style="text-align:center; margin:0;">สรุปยอดขาย</h3>
-    <p style="text-align:center; color:#888; font-size:0.8rem; margin-bottom:15px;">วันที่ ${new Date().toLocaleDateString('th-TH')}</p>
+    // ✅ HTML ใช้ summaryDate
+    let html = `<div class="card" id="summaryPrint" style="padding:20px;">
+        <h3 style="text-align:center; margin:0;">สรุปยอดขาย</h3>
+        <p style="text-align:center; color:#888; font-size:0.8rem; margin-bottom:15px;">
+            วันที่ ${summaryDate}
+        </p>
     
     <div style="display:flex; gap:10px; margin-bottom:15px;">
         <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
