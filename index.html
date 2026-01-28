@@ -15,7 +15,7 @@
             --card-shadow: 0 8px 30px rgba(0,0,0,0.05); --border-radius: 16px;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; }
+        body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; margin-bottom: 50px;}
         .container { max-width: 98%; margin: 0 auto; }
         .card { background: #fff; border-radius: var(--border-radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
         .section-title { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; font-weight: 600; }
@@ -33,10 +33,10 @@
 .fillings-grid span {
     display: block;
     background: #f0f0f0;
-    padding: 15px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    padding: 8px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
     border-radius: 12px;
     text-align: center;
-    font-size: 1.2rem; 
+    font-size: 1.1rem; 
     font-weight: 500; /* ทำให้ตัวหนังสือหนาขึ้นเล็กน้อย */
     transition: 0.2s;
     border: 2px solid transparent;
@@ -113,6 +113,10 @@ body.dark .card {
     background: #1E1E1E;
     border: 1px solid rgba(255,255,255,0.05);
 }
+body.dark .note1 {
+    color: #121212;
+}
+
 body.dark .section-title {
     color: #aaa;
 }
@@ -146,6 +150,32 @@ body.dark .price-input-group input {
 body.dark .toast {
     background: #000;
 }
+
+#floatingBillBtn{
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+
+    background: rgba(0,0,0,0.08);
+    color: #666665;
+    font-size: 16px;
+
+    cursor: pointer;
+}
+body.dark #floatingBillBtn{
+    background: rgba(204, 202, 202, 0.08);
+    color: #ffffff;
+
+}
+
+
 @media (max-width: 768px) {
  padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
     font-size: 1.2rem; 
@@ -196,7 +226,7 @@ body.dark .toast {
         <button id="mainSaveBtn" class="btn btn-save" onclick="saveBill()">💾 บันทึกและเปิดบิล (0.-)</button>
     </div>
 
-    <div class="tabs">
+    <div class="tabs" id="billTabs1">
         <div id="tabDoing" class="tab active" onclick="view='doing';activeBillNo=null;renderBills()">กำลังทำ 🔥</div>
         <div id="tabDone" class="tab" onclick="view='done';activeBillNo=null;renderBills()">เสร็จแล้ว ✅</div>
         <div id="tabSummary" class="tab" onclick="view='summary';activeBillNo=null;renderBills()">สรุปยอด 📊</div>
@@ -219,7 +249,7 @@ let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
 let editingBillNo=null;
 
-const fillings=['หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','หมูสับ','ฮอตดอก','ปูอัด','พิซซ่า','ซอสไข่กุ้ง','สตรอเบอรี่','ใบเตย','ซอสชีส','ครีมข้าวโพด','นูเทลล่า','ฝอยทอง','ยำสาหร่าย','ไข่'];
+const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด'];
 
 const fillingsBox = document.getElementById('fillingsBox');
 fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
@@ -237,30 +267,33 @@ function calcPrice(items){
     let price = BASE;
 
     if(items.includes('นูเทลล่า') && items.includes('ฝอยทอง')) price = 15;
+    if(items.includes('ข้าวโพด') && items.includes('ยำสาหร่าย')) price = 15;
 
-    const hasYum = items.includes('ยำสาหร่าย');
     const hasEgg = items.includes('ไข่');
     const hasRoe = items.includes('ซอสไข่กุ้ง');
+    const hasYum = items.includes('ยำสาหร่าย');
+    const hasCorn = items.includes('ข้าวโพด');
 
     if(hasEgg) price += 5;
     if(hasRoe) price += 5;
 
-    // ✅ logic ยำสาหร่าย
-    if(hasYum){
-        // เอายำสาหร่ายออก แล้วดูว่ามีอะไรเหลือ
-        const others = items.filter(i => i !== 'ยำสาหร่าย');
+    const SPECIAL_GROUP = ['ยำสาหร่าย','ข้าวโพด'];
 
-        // ถ้ามีอย่างอื่นที่ "ไม่ใช่" ไข่ หรือ ซอสไข่กุ้ง
-        const hasOtherExtra = others.some(i => i !== 'ไข่' && i !== 'ซอสไข่กุ้ง');
+const selectedSpecial = items.filter(i => SPECIAL_GROUP.includes(i));
 
-        if(hasOtherExtra){
-            price += 5;
-        }
+if(selectedSpecial.length){
+    const others = items.filter(i => !SPECIAL_GROUP.includes(i));
+    const hasOtherExtra = others.some(
+        i => i !== 'ไข่' && i !== 'ซอสไข่กุ้ง'
+    );
+
+    if(hasOtherExtra){
+        price += 5;
     }
+}
 
     return price;
 }
-
 
 
 function addPiece() {
@@ -411,7 +444,7 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
                 <div style="font-size:1.8rem; line-height:1.7;">
                     ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
                 </div>
-                ${b.note?`<div style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1.2rem;">📝 ${b.note}</div>`:''}
+                ${b.note?`<div class="note1"style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1.2rem;">📝 ${b.note}</div>`:''}
                 ${active?`
 <div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
     
@@ -619,13 +652,22 @@ function exportSummaryExcel(){
 
 function exportSummaryImage(){ 
     const box = document.getElementById('summaryPrint'); 
+
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b => b.status === 'done');
+
+    if(!bills.length) return;
+
+    const billDate = bills[0].date; // วันที่ของข้อมูลบิล
+
     html2canvas(box,{scale:2}).then(canvas=>{ 
         const link = document.createElement('a'); 
-        link.download = `summary-${new Date().toISOString().slice(0,10)}.png`; 
+        link.download = `summary-${billDate}.png`; 
         link.href = canvas.toDataURL(); 
         link.click(); 
     }); 
 }
+
 
 function editBill(no){ 
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
@@ -703,9 +745,45 @@ toggleBtn.onclick = () => {
         document.body.classList.contains('dark') ? '☀️' : '🌙';
 };
 
+let isBillOpened = false;
+
+function toggleBillView(){
+    const bill = document.getElementById('billTabs1');
+    const btn  = document.getElementById('floatingBillBtn');
+    if(!bill || !btn) return;
+
+    if(!isBillOpened){
+        const offset = 25; // เว้นด้านบน กันปุ่มลอยทับ
+        const y =
+            bill.getBoundingClientRect().top +
+            window.pageYOffset -
+            offset;
+
+        window.scrollTo({
+            top: y,
+            behavior: 'smooth'
+        });
+
+        btn.textContent = '▲';   // โหมดบิล
+        isBillOpened = true;
+    }else{
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+
+        btn.textContent = '▼';   // โหมดปกติ
+        isBillOpened = false;
+    }
+}
+
+
 // Initial Render
 renderBills(); 
 renderCurrent();
+
 </script>
+<button id="floatingBillBtn" onclick="toggleBillView()">▼</button>
+
 </body>
 </html>
