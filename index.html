@@ -175,6 +175,13 @@ body.dark #floatingBillBtn{
 
 }
 
+.btn.loading{
+    pointer-events:none;
+    opacity:0.6;
+}
+.btn.loading::after{
+    content:' ⏳';
+}
 
 @media (max-width: 768px) {
  padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
@@ -241,6 +248,7 @@ body.dark #floatingBillBtn{
 <div id="toast" class="toast"></div>
 
 <script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbwqs54N7y8MtLLpwhIHZn2qYWKcDiQvj24rYLASd-i_tj0aQJg7zgJXvO9FlVmGPVYXUw/exec';
 const KEY='tokyo_bills';
 const BASE=10;
 let view='doing';
@@ -475,6 +483,19 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
     if(view==='done'){
         exportBox.innerHTML=`
             <div class="card" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <button id="btnUploadSheet"
+    class="btn btn-outline btn-sm"
+    style="grid-column: span 2;"
+    onclick="uploadBillsToSheet(this)">
+    ☁️ อัพข้อมูลขึ้น Google Sheet
+</button>
+
+<button id="btnFetchSheet"
+    class="btn btn-outline btn-sm"
+    style="grid-column: span 2;"
+    onclick="fetchTodayBillsFromSheet(this)">
+    ⬇️ ดึงข้อมูลวันนี้จาก Sheet
+</button>
                 <input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
                 <button class="btn btn-outline btn-sm" onclick="document.getElementById('importExcel').click()">📥 นำเข้า Excel</button>
                 <button class="btn btn-outline btn-sm" onclick="exportExcel()">📤 ส่งออก Excel</button>
@@ -572,6 +593,69 @@ function renderSummary(){
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ ส่งออกรูปภาพ</button>
     </div>`;
     summaryBox.innerHTML = html;
+}
+
+async function uploadBillsToSheet(btn){
+  const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+    .filter(b => b.status === 'done');
+
+  if (!bills.length) {
+    showToast('ไม่มีบิลให้ส่ง','error');
+    return;
+  }
+
+  lockBtn(btn,true);
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'upload',
+        bills
+      }) // ❗ ไม่มี headers
+    });
+
+    const result = await res.json();
+    showToast(
+      `อัพใหม่ ${result.inserted} บิล | ข้าม ${result.skipped}`,
+      'success'
+    );
+  } catch (e) {
+    showToast('เชื่อม API ไม่ได้','error');
+  }
+
+  lockBtn(btn,false);
+}
+
+async function fetchTodayBillsFromSheet(btn){
+  lockBtn(btn,true);
+
+  try {
+    const res = await fetch(`${API_URL}?action=fetchToday`);
+    const data = await res.json();
+
+    if (!data.length) {
+      showToast('วันนี้ยังไม่มีข้อมูล','error');
+      lockBtn(btn,false);
+      return;
+    }
+
+    const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const merged = [
+      ...localBills.filter(b => !data.some(d => d.billNo === b.billNo)),
+      ...data
+    ];
+
+    localStorage.setItem(KEY, JSON.stringify(merged));
+    syncBillCounter();
+    renderBills();
+
+    showToast(`ดึงมา ${data.length} บิล`,'success');
+  } catch (err) {
+    showToast('เชื่อม API ไม่ได้','error');
+  }
+
+  lockBtn(btn,false);
 }
 
 function importExcel(input){
@@ -776,6 +860,14 @@ function toggleBillView(){
         isBillOpened = false;
     }
 }
+
+function lockBtn(btn, lock=true){
+    if(!btn) return;
+    btn.classList.toggle('loading', lock);
+    btn.disabled = lock;
+}
+
+
 
 
 // Initial Render
