@@ -607,21 +607,20 @@ async function uploadBillsToSheet(btn){
   lockBtn(btn,true);
 
   try {
-    const res = await fetch(API_URL, {
+    await fetch(API_URL, {
       method: 'POST',
+      mode: 'no-cors',   // ⭐ ตัวแก้หลัก
       body: JSON.stringify({
         action: 'upload',
         bills
-      }) // ❗ ไม่มี headers
+      })
     });
 
-    const result = await res.json();
-    showToast(
-      `อัพใหม่ ${result.inserted} บิล | ข้าม ${result.skipped}`,
-      'success'
-    );
+    // ❗ ห้ามอ่าน response
+    showToast('ส่งข้อมูลขึ้น Sheet แล้ว','success');
+
   } catch (e) {
-    showToast('เชื่อม API ไม่ได้','error');
+    showToast('ยิง API ไม่สำเร็จ','error');
   }
 
   lockBtn(btn,false);
@@ -879,3 +878,4 @@ renderCurrent();
 
 </body>
 </html>
+
