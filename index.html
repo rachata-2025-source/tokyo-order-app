@@ -855,63 +855,63 @@ renderCurrent();
 </script>
 
 <script type="module">
-  import {
-    collection,
-    doc,
-    setDoc,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  collection,
+  doc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+window.uploadBillsToFirebase = async function(btn){
+  if(btn.disabled) return;
 
-  window.uploadBillsToFirebase = async function(btn){
-    if(btn.disabled) return;
+  const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
 
-    const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+  // ✅ อัพทุกบิลที่ done (ไม่ต้องสน synced)
+  const targetBills = allBills.filter(b => b.status === 'done');
 
-    // ✅ อัพทุกบิลที่เสร็จแล้ว และยังไม่ synced
-    const targetBills = allBills.filter(
-  b => b.status === 'done' && b.synced !== true
-);
-
-    if(!targetBills.length){
-      alert('ไม่มีบิลใหม่');
-      return;
-    }
-
-    btn.disabled = true;
-    btn.classList.add('loading');
-    const oldText = btn.textContent;
-    btn.textContent = 'กำลังอัพ...';
-
-    try{
-      for(const bill of targetBills){
-        const ref = doc(
-          collection(window.db,'bills'),
-          String(bill.billNo)
-        );
-
-        await setDoc(ref,{
-          ...bill,
-          syncedAt: serverTimestamp()
-        });
-
-        // ✅ mark ว่าอัพแล้ว
-        bill.synced = true;
-      }
-
-      // ✅ merge กลับครบทุกบิล (ไม่ทำหาย)
-      localStorage.setItem(KEY, JSON.stringify(allBills));
-
-      alert(`อัพข้อมูลแล้ว ${targetBills.length} บิล`);
-    }catch(err){
-      console.error(err);
-      alert('อัพข้อมูลไม่สำเร็จ');
-    }
-
-    btn.disabled = false;
-    btn.classList.remove('loading');
-    btn.textContent = oldText;
+  if(!targetBills.length){
+    alert('ไม่มีบิลให้ส่ง');
+    return;
   }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  const oldText = btn.textContent;
+  btn.textContent = 'กำลังอัพ...';
+
+  try{
+    for(const bill of targetBills){
+      // ✅ KEY หลัก กันซ้ำถาวร
+      const docId = `${bill.date}_${bill.billNo}`;
+
+      const ref = doc(
+        collection(window.db,'bills'),
+        docId
+      );
+
+      await setDoc(ref,{
+        ...bill,
+        synced: true,
+        syncedAt: serverTimestamp()
+      },{ merge:true }); // ⭐ สำคัญ
+    }
+
+    // เก็บสถานะไว้เฉย ๆ ไม่ใช่ตัวกันซ้ำ
+    localStorage.setItem(KEY, JSON.stringify(
+      allBills.map(b => ({ ...b, synced:true }))
+    ));
+
+    alert(`อัพข้อมูลแล้ว ${targetBills.length} บิล`);
+  }catch(err){
+    console.error(err);
+    alert('อัพข้อมูลไม่สำเร็จ');
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = oldText;
+}
 </script>
 
 <script type="module">
@@ -967,3 +967,4 @@ alert(`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`)
 
 </body>
 </html>
+
