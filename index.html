@@ -180,6 +180,45 @@ body.dark #floatingBillBtn{
  padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
     font-size: 1.2rem; 
 }
+.sync-btn{
+  padding:14px 22px;
+  font-size:18px;
+  font-weight:700;
+  border:none;
+  border-radius:12px;
+  background:#2563eb;
+  color:#fff;
+  cursor:pointer;
+}
+.sync-btn:disabled{
+  background:#94a3b8;
+  cursor:not-allowed;
+}
+.sync-btn.loading{
+  position:relative;
+}
+.sync-btn.loading::after{
+  content:'';
+  width:18px;
+  height:18px;
+  border:3px solid #fff;
+  border-top-color:transparent;
+  border-radius:50%;
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{
+  to{transform:translateY(-50%) rotate(360deg)}
+}
+.sync-btn.pull{
+  background:#059669; /* เขียว */
+}
+.sync-btn.pull:disabled{
+  background:#9ca3af;
+}
     </style>
 </head>
 <body>
@@ -394,7 +433,8 @@ function saveBill(){
             pieces: JSON.parse(JSON.stringify(currentPieces)), 
             note: noteEl.value, 
             status: 'doing',
-    paid: false   // 👈 เพิ่มบรรทัดนี้
+            paid: false,
+            synced: false
         });
         localStorage.setItem('billCounter', billCounter);
     }
@@ -475,6 +515,13 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
     if(view==='done'){
         exportBox.innerHTML=`
             <div class="card" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+<button id="syncBtn" onclick="uploadBillsToFirebase(this)" class="sync-btn">
+  ⬆️ อัพข้อมูล
+</button>
+<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
+  ⬇️ ดึงข้อมูลวันนี้
+</button>
+
                 <input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
                 <button class="btn btn-outline btn-sm" onclick="document.getElementById('importExcel').click()">📥 นำเข้า Excel</button>
                 <button class="btn btn-outline btn-sm" onclick="exportExcel()">📤 ส่งออก Excel</button>
@@ -788,6 +835,135 @@ renderCurrent();
 
 </script>
 <button id="floatingBillBtn" onclick="toggleBillView()">▼</button>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCx6SGBBh979y6cjyOL75f5PdSr8AZkz0g",
+    authDomain: "tokyo-order-app.firebaseapp.com",
+    projectId: "tokyo-order-app",
+    storageBucket: "tokyo-order-app.firebasestorage.app",
+    messagingSenderId: "411815226779",
+    appId: "1:411815226779:web:373e1ca32daaac264cc53e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  window.db = getFirestore(app);
+</script>
+
+<script type="module">
+  import {
+    collection,
+    doc,
+    setDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+
+  window.uploadBillsToFirebase = async function(btn){
+    if(btn.disabled) return;
+
+    const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+    // ✅ อัพทุกบิลที่เสร็จแล้ว และยังไม่ synced
+    const targetBills = allBills.filter(
+  b => b.status === 'done' && b.synced !== true
+);
+
+    if(!targetBills.length){
+      alert('ไม่มีบิลใหม่');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.classList.add('loading');
+    const oldText = btn.textContent;
+    btn.textContent = 'กำลังอัพ...';
+
+    try{
+      for(const bill of targetBills){
+        const ref = doc(
+          collection(window.db,'bills'),
+          String(bill.billNo)
+        );
+
+        await setDoc(ref,{
+          ...bill,
+          syncedAt: serverTimestamp()
+        });
+
+        // ✅ mark ว่าอัพแล้ว
+        bill.synced = true;
+      }
+
+      // ✅ merge กลับครบทุกบิล (ไม่ทำหาย)
+      localStorage.setItem(KEY, JSON.stringify(allBills));
+
+      alert(`อัพข้อมูลแล้ว ${targetBills.length} บิล`);
+    }catch(err){
+      console.error(err);
+      alert('อัพข้อมูลไม่สำเร็จ');
+    }
+
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = oldText;
+  }
+</script>
+
+<script type="module">
+  import {
+    collection,
+    getDocs,
+    query,
+    where
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+
+  window.loadTodayBillsFromFirebase = async function(btn){
+    if(btn.disabled) return;
+
+    btn.disabled = true;
+    btn.classList.add('loading');
+    const oldText = btn.textContent;
+    btn.textContent = 'กำลังดึง...';
+
+    try{
+      const today = new Date().toISOString().slice(0,10);
+
+const q = query(
+  collection(window.db,'bills'),
+  where('date','==',today)
+);
+
+const snap = await getDocs(q);
+const pulledBills = snap.docs.map(d => ({ ...d.data(), synced:true }));
+
+const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+// เก็บบิลที่ยังไม่ done ไว้
+const merged = [
+  ...localBills.filter(b => b.status !== 'done'),
+  ...pulledBills
+];
+
+localStorage.setItem(KEY, JSON.stringify(merged));
+renderBills();
+
+alert(`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`);
+    }catch(err){
+      console.error(err);
+      alert('ดึงข้อมูลไม่สำเร็จ');
+    }
+
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = oldText;
+  }
+</script>
 
 </body>
 </html>
