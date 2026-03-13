@@ -297,7 +297,7 @@ let view='doing';
 let currentPieces=[];
 let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
-let editingBillNo=null;
+let editingBillId=null;
 
 const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด'];
 
@@ -429,13 +429,13 @@ function saveBill(){
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
     const noteEl = document.getElementById('billNote');
     
-    if(editingBillNo !== null){
-        const b = bills.find(x => x.billNo === editingBillNo);
+    if(editingBillId !== null){
+    const b = bills.find(x => x.id === editingBillId);
         if(b){ 
             b.pieces = JSON.parse(JSON.stringify(currentPieces)); 
             b.note = noteEl.value; 
         }
-        editingBillNo = null;
+        editingBillId = null;
     } else {
         const newId = createBillId();
         bills.push({
@@ -462,24 +462,45 @@ renderBills();
 }
 
 function renderBills(){
+
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const editingBill = bills.find(x => x.id === editingBillId);
+
     const editHint = document.getElementById('editHint');
     const billList = document.getElementById('billList');
     const summaryBox = document.getElementById('summaryBox');
     const exportBox = document.getElementById('exportBox');
     const todayTotal = document.getElementById('todayTotal');
 
-    editHint.innerText = editingBillNo !== null ? `✏️ กำลังแก้ไขบิล #${editingBillNo}` : '';
+    editHint.innerHTML = editingBill
+ ? `<div class="alert-edit">
+      ✏️ กำลังแก้ไขบิล #${editingBill.billNo}
+    </div>`
+ : '';
+
     document.getElementById('tabDoing').classList.toggle('active',view==='doing');
     document.getElementById('tabDone').classList.toggle('active',view==='done');
     document.getElementById('tabSummary').classList.toggle('active', view==='summary');
 
-    summaryBox.innerHTML = ''; billList.innerHTML=''; exportBox.innerHTML=''; todayTotal.innerHTML='';
-    if(view === 'summary'){ renderSummary(); return; }
+    summaryBox.innerHTML = '';
+    billList.innerHTML='';
+    exportBox.innerHTML='';
+    todayTotal.innerHTML='';
 
-    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status===view);
+    if(view === 'summary'){ 
+        renderSummary(); 
+        return; 
+    }
+
     if(view === 'done') renderTodayTotal();
 
-    bills.sort((a,b) => view==='doing' ? a.billNo - b.billNo : b.billNo - a.billNo).forEach(b=>{
+    let filteredBills = bills.filter(b => 
+    view === 'doing' ? b.status === 'doing' : b.status === 'done'
+);
+
+filteredBills
+.sort((a,b) => view==='doing' ? a.billNo - b.billNo : b.billNo - a.billNo)
+.forEach(b=>{
         const sum = b.pieces.reduce((s,p)=> s + (parseInt(p.price)*(p.qty||1)), 0);
         const active = activeBillNo === b.id;
 const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
@@ -532,9 +553,9 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
 <button id="syncBtn" onclick="uploadBillsToFirebase(this)" class="sync-btn">
   ⬆️ อัพข้อมูล
 </button>
-<!--<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
+<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
   ⬇️ ดึงข้อมูลวันนี้
-</button>-->
+</button>
 
                 <input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
                 <button class="btn btn-outline btn-sm" onclick="document.getElementById('importExcel').click()">📥 นำเข้า Excel</button>
@@ -646,7 +667,9 @@ function importExcel(input){
         let billsMap = {};
         rows.forEach(r=>{
             const [date,billNo,items,qty,price,total,note] = r; if(!billNo) return;
-            if(!billsMap[billNo]) billsMap[billNo]={ billNo:Number(billNo), date, time: new Date().toLocaleTimeString('th-TH'), status:'done', note:note||'', pieces:[] };
+            if(!billsMap[billNo]) billsMap[billNo]={ 
+    id: createBillId(),
+    billNo:Number(billNo), date, time: new Date().toLocaleTimeString('th-TH'), status:'done', note:note||'', pieces:[] };
             billsMap[billNo].pieces.push({ items: String(items).split('+'), qty: Number(qty)||1, price: Number(price)||0 });
         });
         const currentBills = JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -721,13 +744,14 @@ function exportSummaryExcel(){
 
 function exportSummaryImage(){ 
     const box = document.getElementById('summaryPrint'); 
+    if(!box) return;
 
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
         .filter(b => b.status === 'done');
 
     if(!bills.length) return;
 
-    const billDate = bills[0].date; // วันที่ของข้อมูลบิล
+    const billDate = bills[0].date;
 
     html2canvas(box,{scale:2}).then(canvas=>{ 
         const link = document.createElement('a'); 
@@ -742,13 +766,15 @@ function editBill(id){
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
     const b = bills.find(x=>x.id===id); 
     if(!b) return; 
+
     currentPieces = JSON.parse(JSON.stringify(b.pieces)); 
     document.getElementById('billNote').value = b.note || ''; 
-    editingBillNo = no; 
+
+    editingBillId = b.id;
+
     view = 'doing'; 
     renderCurrent(); 
-    recalcBillCounter();
-renderBills(); 
+    renderBills(); 
     window.scrollTo(0,0); 
 }
 
@@ -765,17 +791,19 @@ renderBills();
 
 function selectBill(id){
     activeBillNo = activeBillNo===id ? null : id;
-    recalcBillCounter();
 renderBills();
 }
 function deleteBill(id){ 
-    if(confirm(`ลบบิล #${no}?`)){ 
-        const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
-        const filtered = bills.filter(b=>b.billNo!==no);
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const b = bills.find(x=>x.id===id);
+    if(!b) return;
+
+    if(confirm(`ลบบิล #${b.billNo}?`)){ 
+        const filtered = bills.filter(x=>x.id!==id);
         localStorage.setItem(KEY, JSON.stringify(filtered));
+
         activeBillNo=null; 
-        recalcBillCounter();
-renderBills(); 
+        renderBills(); 
     } 
 }
 function clearDoneBills(){ 
@@ -789,11 +817,16 @@ renderBills();
     } 
 }
 
-function showToast(msg,type){ 
-    const t=document.getElementById('toast'); 
-    t.className='toast show '+type; 
-    t.innerText=msg; 
-    setTimeout(()=>t.className='toast',2000); 
+function showToast(msg,type='success'){
+Swal.fire({
+    toast:true,
+    position:'top',
+    icon:type,
+    title:msg,
+    showConfirmButton:false,
+    timer:1800,
+    timerProgressBar:true
+});
 }
 
 function closeShop(){ 
@@ -806,7 +839,7 @@ function closeShop(){
 }
 function togglePaid(id){
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
-    const b = bills.find(x => x.billNo === no);
+    const b = bills.find(x => x.id === id);
     if(!b) return;
 
     b.paid = !b.paid;
@@ -815,6 +848,15 @@ function togglePaid(id){
 renderBills();
 }
 const toggleBtn = document.getElementById('darkToggle');
+
+if(toggleBtn){
+toggleBtn.onclick = () => {
+    document.body.classList.toggle('dark');
+
+    toggleBtn.textContent =
+        document.body.classList.contains('dark') ? '☀️' : '🌙';
+};
+}
 
 toggleBtn.onclick = () => {
     document.body.classList.toggle('dark');
@@ -891,55 +933,84 @@ renderCurrent();
   } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
   window.uploadBillsToFirebase = async function(btn){
-    if(btn.disabled) return;
+if(btn.disabled) return;
 
-    const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+const confirm = await Swal.fire({
+title:'อัพโหลดข้อมูล?',
+text:'ต้องการส่งบิลที่เสร็จแล้วไป Firebase',
+icon:'question',
+showCancelButton:true,
+confirmButtonText:'อัพข้อมูล',
+cancelButtonText:'ยกเลิก'
+});
 
-    // ✅ อัพทุกบิลที่เสร็จแล้ว และยังไม่ synced
-    const targetBills = allBills.filter(
-  b => b.status === 'done' && b.synced !== true
+if(!confirm.isConfirmed) return;
+
+const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+const targetBills = allBills.filter(
+b => b.status === 'done' && b.synced !== true
 );
 
-    if(!targetBills.length){
-      alert('ไม่มีบิลใหม่');
-      return;
-    }
+if(!targetBills.length){
+Swal.fire({
+icon:'info',
+title:'ไม่มีบิลใหม่',
+timer:1500,
+showConfirmButton:false
+});
+return;
+}
 
-    btn.disabled = true;
-    btn.classList.add('loading');
-    const oldText = btn.textContent;
-    btn.textContent = 'กำลังอัพ...';
+btn.disabled = true;
+btn.classList.add('loading');
+const oldText = btn.textContent;
+btn.textContent = 'กำลังอัพ...';
 
-    try{
-      for(const bill of targetBills){
-        const docId = bill.id;
-        const ref = doc(
-        collection(window.db,'bills'),
-        docId
-        );
+try{
 
-        await setDoc(ref,{
-          ...bill,
-          syncedAt: serverTimestamp()
-        });
+for(const bill of targetBills){
 
-        // ✅ mark ว่าอัพแล้ว
-        bill.synced = true;
-      }
+const docId = bill.id;
 
-      // ✅ merge กลับครบทุกบิล (ไม่ทำหาย)
-      localStorage.setItem(KEY, JSON.stringify(allBills));
+const ref = doc(
+collection(window.db,'bills'),
+docId
+);
 
-      alert(`อัพข้อมูลแล้ว ${targetBills.length} บิล`);
-    }catch(err){
-      console.error(err);
-      alert('อัพข้อมูลไม่สำเร็จ');
-    }
+await setDoc(ref,{
+...bill,
+syncedAt: serverTimestamp()
+});
 
-    btn.disabled = false;
-    btn.classList.remove('loading');
-    btn.textContent = oldText;
-  }
+bill.synced = true;
+}
+
+localStorage.setItem(KEY, JSON.stringify(allBills));
+
+Swal.fire({
+icon:'success',
+title:`อัพข้อมูลแล้ว ${targetBills.length} บิล`,
+timer:1600,
+showConfirmButton:false
+});
+
+}catch(err){
+
+console.error(err);
+
+Swal.fire({
+icon:'error',
+title:'อัพข้อมูลไม่สำเร็จ'
+});
+
+}
+
+btn.disabled = false;
+btn.classList.remove('loading');
+btn.textContent = oldText;
+
+}
 </script>
 
 <script type="module">
@@ -952,47 +1023,82 @@ renderCurrent();
 
 
   window.loadTodayBillsFromFirebase = async function(btn){
-    if(btn.disabled) return;
+  if(btn.disabled) return;
 
-    btn.disabled = true;
-    btn.classList.add('loading');
-    const oldText = btn.textContent;
-    btn.textContent = 'กำลังดึง...';
+  const confirm = await Swal.fire({
+    title:'ดึงข้อมูลวันนี้?',
+    text:'โหลดบิลวันนี้จาก Firebase',
+    icon:'question',
+    showCancelButton:true,
+    confirmButtonText:'ดึงข้อมูล',
+    cancelButtonText:'ยกเลิก'
+  });
 
-    try{
-      const today = new Date().toISOString().slice(0,10);
+  if(!confirm.isConfirmed) return;
 
-const q = query(
-  collection(window.db,'bills'),
-  where('date','==',today)
-);
-
-const snap = await getDocs(q);
-const pulledBills = snap.docs.map(d => ({ ...d.data(), synced:true }));
-
-const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
-
-// เก็บบิลที่ยังไม่ done ไว้
-const map = {};
-[...localBills, ...pulledBills].forEach(b=>{
-  map[b.id] = b;
-});
-const merged = Object.values(map);
-
-localStorage.setItem(KEY, JSON.stringify(merged));
-recalcBillCounter();
-renderBills();
-
-alert(`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`);
-    }catch(err){
-      console.error(err);
-      alert('ดึงข้อมูลไม่สำเร็จ');
-    }
-
-    btn.disabled = false;
-    btn.classList.remove('loading');
-    btn.textContent = oldText;
+  if(!window.db){
+    Swal.fire({icon:'error',title:'ยังไม่ได้เชื่อม Firebase'});
+    return;
   }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  const oldText = btn.textContent;
+  btn.textContent = 'กำลังดึง...';
+
+  try{
+
+    const today = new Date().toISOString().slice(0,10);
+
+    const q = query(
+      collection(window.db,'bills'),
+      where('date','==',today)
+    );
+
+    const snap = await getDocs(q);
+
+    const pulledBills = snap.docs.map(d => ({
+      ...d.data(),
+      synced:true
+    }));
+
+    const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+    const map = {};
+
+    [...localBills, ...pulledBills].forEach(b=>{
+      if(b && b.id) map[b.id] = b;
+    });
+
+    const merged = Object.values(map);
+
+    localStorage.setItem(KEY, JSON.stringify(merged));
+
+    recalcBillCounter();
+    renderBills();
+
+    Swal.fire({
+      icon:'success',
+      title:`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`,
+      timer:1600,
+      showConfirmButton:false
+    });
+
+  }catch(err){
+
+    console.error(err);
+
+    Swal.fire({
+      icon:'error',
+      title:'ดึงข้อมูลไม่สำเร็จ'
+    });
+
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = oldText;
+}
 </script>
 
 </body>
