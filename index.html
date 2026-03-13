@@ -290,6 +290,9 @@ body.dark #floatingBillBtn{
 <script>
 const KEY='tokyo_bills';
 const BASE=10;
+function createBillId(){
+  return 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+}
 let view='doing';
 let currentPieces=[];
 let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
@@ -434,7 +437,9 @@ function saveBill(){
         }
         editingBillNo = null;
     } else {
+        const newId = createBillId();
         bills.push({
+            id: newId,
             billNo: billCounter++, 
             date: new Date().toISOString().slice(0,10),
             time: new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
@@ -451,7 +456,8 @@ function saveBill(){
     currentPieces = []; 
     noteEl.value = ''; 
     renderCurrent(); 
-    renderBills(); 
+    recalcBillCounter();
+renderBills(); 
     showToast('บันทึกบิลสำเร็จ!','success');
 }
 
@@ -475,10 +481,10 @@ function renderBills(){
 
     bills.sort((a,b) => view==='doing' ? a.billNo - b.billNo : b.billNo - a.billNo).forEach(b=>{
         const sum = b.pieces.reduce((s,p)=> s + (parseInt(p.price)*(p.qty||1)), 0);
-        const active = activeBillNo === b.billNo;
+        const active = activeBillNo === b.id;
 const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
         billList.innerHTML+=`
-            <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
+            <div class="card" onclick="selectBill('${b.id}')" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
                 <div class="bill-header">
                     <span style="font-size:1.1rem; color:#888;">#${b.billNo} • ${b.time}  </span>
 ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
@@ -497,23 +503,23 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
 <div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
     
     <button class="btn btn-outline btn-sm" style="flex:1"
-        onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
+        onclick="editBill('${b.id}');event.stopPropagation()">✏️ แก้ไข</button>
 
     <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;"
-        onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
+        onclick="deleteBill('${b.id}');event.stopPropagation()">🗑️ ลบ</button>
 
     ${b.status==='doing'?`
         ${(view==='doing' && b.status==='doing') ? `
     <button class="btn btn-sm"
         style="flex:1; background:${b.paid?'#d4edda':'#fff3cd'};"
-        onclick="togglePaid(${b.billNo});event.stopPropagation()">
+        onclick="togglePaid('${b.id}');event.stopPropagation()">
         ${b.paid?'ยังไม่จ่าย':'✅ จ่ายแล้ว'}
     </button>
 ` : ''}
 
 
         <button class="btn btn-finish-large" style="flex:3"
-            onclick="finishBill(${b.billNo});event.stopPropagation()">✅ เสร็จแล้ว</button>
+            onclick="finishBill('${b.id}');event.stopPropagation()">✅ เสร็จแล้ว</button>
     `:''}
 
 </div>`:''}
@@ -646,7 +652,8 @@ function importExcel(input){
         const currentBills = JSON.parse(localStorage.getItem(KEY) || '[]');
         const merged = [...currentBills.filter(b=>!billsMap[b.billNo]), ...Object.values(billsMap)];
         localStorage.setItem(KEY, JSON.stringify(merged));
-        syncBillCounter(); renderBills(); showToast('นำเข้าข้อมูลสำเร็จ','success');
+        syncBillCounter(); recalcBillCounter();
+renderBills(); showToast('นำเข้าข้อมูลสำเร็จ','success');
     };
     reader.readAsArrayBuffer(file);
 }
@@ -656,6 +663,13 @@ function syncBillCounter(){
     const maxNo = bills.reduce((m,b)=>Math.max(m,parseInt(b.billNo)||0),0); 
     billCounter = maxNo + 1; 
     localStorage.setItem('billCounter', billCounter); 
+}
+
+function recalcBillCounter(){
+  const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+  const maxNo = bills.reduce((m,b)=>Math.max(m, Number(b.billNo)||0),0);
+  billCounter = maxNo + 1;
+  localStorage.setItem('billCounter', billCounter);
 }
 
 function exportExcel(){
@@ -724,37 +738,44 @@ function exportSummaryImage(){
 }
 
 
-function editBill(no){ 
+function editBill(id){ 
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
-    const b = bills.find(x=>x.billNo===no); 
+    const b = bills.find(x=>x.id===id); 
     if(!b) return; 
     currentPieces = JSON.parse(JSON.stringify(b.pieces)); 
     document.getElementById('billNote').value = b.note || ''; 
     editingBillNo = no; 
     view = 'doing'; 
     renderCurrent(); 
-    renderBills(); 
+    recalcBillCounter();
+renderBills(); 
     window.scrollTo(0,0); 
 }
 
-function finishBill(no){ 
+function finishBill(id){ 
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
-    const b = bills.find(x=>x.billNo===no); 
+    const b = bills.find(x=>x.id===id); 
     if(!b) return; 
     b.status='done'; 
     localStorage.setItem(KEY, JSON.stringify(bills));
-    renderBills(); 
+    recalcBillCounter();
+renderBills(); 
     showToast('บิลสำเร็จ!','success'); 
 }
 
-function selectBill(no){ activeBillNo = activeBillNo===no ? null : no; renderBills(); }
-function deleteBill(no){ 
+function selectBill(id){
+    activeBillNo = activeBillNo===id ? null : id;
+    recalcBillCounter();
+renderBills();
+}
+function deleteBill(id){ 
     if(confirm(`ลบบิล #${no}?`)){ 
         const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
         const filtered = bills.filter(b=>b.billNo!==no);
         localStorage.setItem(KEY, JSON.stringify(filtered));
         activeBillNo=null; 
-        renderBills(); 
+        recalcBillCounter();
+renderBills(); 
     } 
 }
 function clearDoneBills(){ 
@@ -763,7 +784,8 @@ function clearDoneBills(){
         const filtered = bills.filter(b=>b.status!=='done');
         localStorage.setItem(KEY, JSON.stringify(filtered));
         syncBillCounter(); 
-        renderBills(); 
+        recalcBillCounter();
+renderBills(); 
     } 
 }
 
@@ -782,14 +804,15 @@ function closeShop(){
         location.reload(); 
     } 
 }
-function togglePaid(no){
+function togglePaid(id){
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
     const b = bills.find(x => x.billNo === no);
     if(!b) return;
 
     b.paid = !b.paid;
     localStorage.setItem(KEY, JSON.stringify(bills));
-    renderBills();
+    recalcBillCounter();
+renderBills();
 }
 const toggleBtn = document.getElementById('darkToggle');
 
@@ -834,6 +857,7 @@ function toggleBillView(){
 
 
 // Initial Render
+recalcBillCounter();
 renderBills(); 
 renderCurrent();
 
@@ -888,7 +912,7 @@ renderCurrent();
 
     try{
       for(const bill of targetBills){
-        const docId = `${bill.date}_${bill.billNo}`;
+        const docId = bill.id;
         const ref = doc(
         collection(window.db,'bills'),
         docId
@@ -949,12 +973,14 @@ const pulledBills = snap.docs.map(d => ({ ...d.data(), synced:true }));
 const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
 
 // เก็บบิลที่ยังไม่ done ไว้
-const merged = [
-  ...localBills.filter(b => b.status !== 'done'),
-  ...pulledBills
-];
+const map = {};
+[...localBills, ...pulledBills].forEach(b=>{
+  map[b.id] = b;
+});
+const merged = Object.values(map);
 
 localStorage.setItem(KEY, JSON.stringify(merged));
+recalcBillCounter();
 renderBills();
 
 alert(`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`);
