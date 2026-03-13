@@ -526,9 +526,9 @@ ${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
 <button id="syncBtn" onclick="uploadBillsToFirebase(this)" class="sync-btn">
   ⬆️ อัพข้อมูล
 </button>
-<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
+<!--<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
   ⬇️ ดึงข้อมูลวันนี้
-</button>
+</button>-->
 
                 <input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
                 <button class="btn btn-outline btn-sm" onclick="document.getElementById('importExcel').click()">📥 นำเข้า Excel</button>
