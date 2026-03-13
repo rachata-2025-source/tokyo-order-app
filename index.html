@@ -13,7 +13,9 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
     <style>
         :root {
             --primary: #FF9800; --primary-dark: #F57C00; --secondary: #2196F3;
@@ -21,254 +23,950 @@
             --card-shadow: 0 8px 30px rgba(0,0,0,0.05); --border-radius: 16px;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; margin-bottom: 60px; transition: background 0.3s; }
+        body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; margin-bottom: 50px;}
+        .container { max-width: 98%; margin: 0 auto; }
+        .card { background: #fff; border-radius: var(--border-radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
+        .section-title { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; font-weight: 600; }
         
-        .container { max-width: 600px; margin: 0 auto; }
-        .card { background: #fff; border-radius: var(--border-radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); position: relative; }
-        
-        /* สไตล์ปุ่มระบบเน็ต */
-        .btn-sync-group { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn-sync-group button { flex: 1; border: none; padding: 12px; border-radius: 12px; color: white; cursor: pointer; font-family: 'Kanit'; font-weight: 500; transition: all 0.3s; }
-        .offline-mode { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
-
-        /* สไตล์หน้าจดออเดอร์ */
-        .section-title { font-size: 0.95rem; color: #888; text-transform: uppercase; margin-bottom: 8px; display: block; font-weight: 600; }
-        .fillings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-bottom: 15px; }
+        /* Fillings Grid */
+        /* ปรับ Grid ให้รองรับปุ่มที่ใหญ่ขึ้น (ถ้าปุ่มใหญ่ไปจนเบียดกัน) */
+.fillings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* ปรับขนาดขั้นต่ำจาก 80 เป็น 95 */
+    gap: 8px; /* เพิ่มระยะห่างระหว่างปุ่ม */
+    margin-bottom: 15px;
+}
         .fillings-grid input { display: none; }
-        .fillings-grid span { display: block; background: #f0f0f0; padding: 8px 4px; border-radius: 12px; text-align: center; font-size: 1rem; transition: 0.2s; border: 2px solid transparent; }
-        .fillings-grid input:checked + span { background: #FFF3E0; border-color: var(--primary); color: var(--primary-dark); font-weight: 600; }
+        /* ปรับปุ่มไส้มาตรฐานให้ใหญ่และกดง่ายขึ้น */
+.fillings-grid span {
+    display: block;
+    background: #f0f0f0;
+    padding: 8px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    border-radius: 12px;
+    text-align: center;
+    font-size: 1.1rem; 
+    font-weight: 500; /* ทำให้ตัวหนังสือหนาขึ้นเล็กน้อย */
+    transition: 0.2s;
+    border: 2px solid transparent;
+}
+        .fillings-grid input:checked + span { background: #FFF3E0; border-color: var(--primary); color: var(--primary-dark); font-weight: 500; }
 
-        .btn { border: none; border-radius: 12px; padding: 12px; font-family: 'Kanit'; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-add { background: var(--primary); color: white; width: 100%; }
-        .btn-save { background: var(--success); color: white; width: 100%; font-size: 1.1rem; }
+        /* Custom Input Section */
+        #customInputArea { display: none; margin-bottom: 12px; background: #FFF3E0; padding: 12px; border-radius: 12px; border: 1px dashed var(--primary); }
+        .custom-fill-group { display: flex; gap: 4px; }
+        .custom-fill-group input { border: 1px solid #ddd; background: #fff; padding: 8px; border-radius: 8px; font-family: 'Kanit'; outline: none; font-size: 0.9rem; min-width: 0;}
+        .btn-toggle-custom { background: #f1f3f5; color: #666; width: 100%; margin-bottom: 12px; font-size: 0.9rem; border: 1px solid #eee; border-radius: 10px; padding: 10px; cursor: pointer; }
+
+        /* Current Bill UI */
+        .current-item { border-bottom: 1px solid #f8f8f8; padding: 8px 0; }
+        .item-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .price-input-group { display: flex; align-items: center; gap: 3px; background: #f1f3f5; padding: 2px 8px; border-radius: 8px; }
+        .price-input-group input { border: none; background: transparent; width: 40px; font-family: 'Kanit'; text-align: center; font-weight: 600; outline: none; }
+
+        /* Buttons & Tabs */
+        .btn { border: none; border-radius: 12px; padding: 12px; font-family: 'Kanit'; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
+        .btn-add { background: var(--primary); color: white; height: 45px; }
+        .btn-save { background: var(--success); color: white; width: 100%; font-size: 1.1rem; margin-top: 10px; }
+        .btn-outline { background: #fff; border: 1.5px solid #eee; color: #666; }
+        .btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 8px; }
         
         .tabs { display: flex; gap: 6px; margin: 15px 0; background: #eee; padding: 4px; border-radius: 14px; }
         .tab { flex: 1; padding: 10px; text-align: center; border-radius: 10px; cursor: pointer; font-size: 0.85rem; color: #777; }
-        .tab.active { background: #fff; color: var(--secondary); font-weight: 600; }
+        .tab.active { background: #fff; color: var(--secondary); font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 
-        .current-item { border-bottom: 1px solid #f1f1f1; padding: 8px 0; display: flex; justify-content: space-between; align-items: center; }
-        .qty-mini-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ddd; background: #fff; display: flex; align-items: center; justify-content: center; }
-        
-        body.dark { --bg: #121212; color: #eee; }
-        body.dark .card { background: #1E1E1E; border-color: #333; }
-        body.dark .fillings-grid span { background: #2A2A2A; color: #ddd; }
+        .bill-header { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 24px; border-radius: 50px; font-size: 0.9rem; z-index: 2000; opacity: 0; transition: 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; pointer-events: auto; }
+        .toast.error { background: var(--danger); }
+        .toast.success { background: var(--success); }
+
+/* ปรับปุ่มเสร็จแล้วให้เด่นและใหญ่ขึ้น */
+.btn-finish-large {
+    flex: 3 !important; /* ให้กว้างกว่าปุ่มแก้ไขและลบ */
+    font-size: 1rem !important; /* ขยายตัวอักษร */
+    padding: 10px !important; /* เพิ่มความหนาของปุ่ม */
+    background-color: var(--success) !important;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); /* เพิ่มเงาให้ดูน่ากด */
+}
+/* ปุ่มโหมดมืด */
+.dark-toggle {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: #333;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 3000;
+}
+/* ===== DARK MODE ===== */
+body.dark {
+    --bg: #121212;
+    --primary: #FFB74D;
+    --primary-dark: #FFA726;
+    --secondary: #64B5F6;
+    --success: #66BB6A;
+    --danger: #EF5350;
+}
+body.dark {
+    background-color: var(--bg);
+    color: #eee;
+}
+body.dark .card {
+    background: #1E1E1E;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+body.dark .note1 {
+    color: #121212;
+}
+
+body.dark .section-title {
+    color: #aaa;
+}
+body.dark .fillings-grid span {
+    background: #2A2A2A;
+    color: #ddd;
+}
+body.dark .fillings-grid input:checked + span {
+    background: #3A2A1A;
+}
+body.dark .tabs {
+    background: #2A2A2A;
+}
+body.dark .tab.active {
+    background: #1E1E1E;
+}
+body.dark .btn-outline {
+    background: #1E1E1E;
+    color: #ddd;
+    border-color: #333;
+}
+
+body.dark .price-input-group{
+    background: #2A2A2A;
+
+}
+body.dark .price-input-group input {
+    color: #fff;
+}
+
+body.dark .toast {
+    background: #000;
+}
+
+#floatingBillBtn{
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+
+    background: rgba(0,0,0,0.08);
+    color: #666665;
+    font-size: 16px;
+
+    cursor: pointer;
+}
+body.dark #floatingBillBtn{
+    background: rgba(204, 202, 202, 0.08);
+    color: #ffffff;
+
+}
+
+
+@media (max-width: 768px) {
+ padding: 10px 4px; /* เพิ่ม Padding บน-ล่าง จาก 10 เป็น 15 */
+    font-size: 1.2rem; 
+}
+.sync-btn{
+  padding:14px 22px;
+  font-size:18px;
+  font-weight:700;
+  border:none;
+  border-radius:12px;
+  background:#2563eb;
+  color:#fff;
+  cursor:pointer;
+}
+.sync-btn:disabled{
+  background:#94a3b8;
+  cursor:not-allowed;
+}
+.sync-btn.loading{
+  position:relative;
+}
+.sync-btn.loading::after{
+  content:'';
+  width:18px;
+  height:18px;
+  border:3px solid #fff;
+  border-top-color:transparent;
+  border-radius:50%;
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{
+  to{transform:translateY(-50%) rotate(360deg)}
+}
+.sync-btn.pull{
+  background:#059669; /* เขียว */
+}
+.sync-btn.pull:disabled{
+  background:#9ca3af;
+}
     </style>
 </head>
 <body>
 
 <div class="container">
-    <button id="darkToggle" style="position:fixed; top:12px; right:12px; z-index:99; border:none; background:#333; color:#fff; padding:8px; border-radius:50%; width:40px; height:40px;">🌙</button>
+<button id="darkToggle" class="dark-toggle">🌙</button>
 
-    <div class="btn-sync-group">
-        <button onclick="uploadAllUnsynced(this)" class="btn-sync" style="background: var(--success);">📤 อัปโหลดข้อมูล</button>
-        <button onclick="loadTodayBillsFromFirebase(this)" class="btn-load" style="background: var(--secondary);">📥 ดึงข้อมูลวันนี้</button>
-    </div>
-
-    <div class="card">
-        <span class="section-title">สั่งขนม - ร้านมากินโตเกียว</span>
+    <div class="card" style="padding-bottom:12px;">
+        <span class="section-title">เลือกไส้มาตรฐาน</span>
         <div class="fillings-grid" id="fillingsBox"></div>
         
-        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <button class="btn-toggle-custom" id="btnShowCustom" onclick="toggleCustomArea(true)">➕ ระบุไส้เอง</button>
+        
+        <div id="customInputArea">
+            <span class="section-title" style="color:var(--primary-dark)">ระบุข้อมูลไส้ใหม่</span>
+            <div class="custom-fill-group">
+                <input type="text" id="customName" placeholder="ชื่อไส้..." style="flex:2">
+                <input type="number" id="customPrice" placeholder="ราคา" style="flex:1">
+            </div>
+            <div style="display:flex; gap:6px; margin-top:8px;">
+                <button class="btn btn-outline btn-sm" style="flex:1" onclick="toggleCustomArea(false)">ยกเลิก</button>
+                <button class="btn btn-add btn-sm" style="flex:2" onclick="addCustomPiece()">เพิ่มไส้นี้ลงบิล</button>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
             <div style="flex: 1; background: #F1F3F5; padding: 5px; border-radius: 12px; display:flex; justify-content:space-around; align-items:center;">
-                <button class="qty-mini-btn" onclick="changeGlobalQty(-1)">−</button>
-                <input type="number" id="pieceQty" value="1" readonly style="border:none; background:transparent; width:30px; text-align:center; font-weight:600;">
-                <button class="qty-mini-btn" onclick="changeGlobalQty(1)">＋</button>
+                <button class="btn btn-outline btn-sm" style="border-radius:50%; width:30px; height:30px; padding:0" onclick="changeQty(-1)">−</button>
+                <input type="number" id="pieceQty" value="1" readonly style="border:none; background:transparent; width:35px; text-align:center; font-weight:600;">
+                <button class="btn btn-outline btn-sm" style="border-radius:50%; width:30px; height:30px; padding:0" onclick="changeQty(1)">＋</button>
             </div>
             <button class="btn btn-add" style="flex: 2;" onclick="addPiece()">➕ เพิ่มลงบิล</button>
         </div>
+    </div>
 
-        <div id="currentBillContainer" style="border-top: 2px solid #f5f5f5; padding-top: 10px;">
-            <span class="section-title" id="currentBillHeader">รายการในบิล (0 ชิ้น)</span>
-            <div id="currentBill"></div>
-            <textarea id="billNote" style="width:100%; height:40px; border:1px solid #eee; border-radius:10px; padding:8px; margin-top:10px; font-family:'Kanit';" placeholder="หมายเหตุ..."></textarea>
-            <button id="mainSaveBtn" class="btn btn-save" onclick="saveBill()" style="margin-top:10px;">💾 บันทึกและเปิดบิล (0.-)</button>
+    <div id="editHint" style="text-align:center; font-weight:bold; color:var(--danger); font-size:0.9rem;"></div>
+    <div class="card" id="currentBillContainer" style="padding: 12px;">
+        <span class="section-title" style="margin-bottom:5px;">รายการในบิลตอนนี้</span>
+        <div id="currentBill"></div>
+        
+        <div style="margin-top:10px;">
+            <textarea id="billNote" style="width:100%; height:35px; border:1px solid #eee; border-radius:10px; padding:8px; font-family:'Kanit'; outline:none; font-size:0.9rem;" placeholder="หมายเหตุในบิล..."></textarea>
+        </div>
+        <button id="mainSaveBtn" class="btn btn-save" onclick="saveBill()">💾 บันทึกและเปิดบิล (0.-)</button>
+    </div>
+
+    <div class="tabs" id="billTabs1">
+        <div id="tabDoing" class="tab active" onclick="view='doing';activeBillNo=null;renderBills()">กำลังทำ 🔥</div>
+        <div id="tabDone" class="tab" onclick="view='done';activeBillNo=null;renderBills()">เสร็จแล้ว ✅</div>
+        <div id="tabSummary" class="tab" onclick="view='summary';activeBillNo=null;renderBills()">สรุปยอด 📊</div>
+    </div>
+
+    <div id="todayTotal"></div>
+    <div id="billList"></div>
+    <div id="summaryBox"></div>
+    <div id="exportBox"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const KEY='tokyo_bills';
+const BASE=10;
+let view='doing';
+let currentPieces=[];
+let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
+let activeBillNo=null;
+let editingBillNo=null;
+
+const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด'];
+
+const fillingsBox = document.getElementById('fillingsBox');
+fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
+
+function toggleCustomArea(show) {
+    document.getElementById('customInputArea').style.display = show ? 'block' : 'none';
+    document.getElementById('btnShowCustom').style.display = show ? 'none' : 'block';
+    if(!show) {
+        document.getElementById('customName').value = '';
+        document.getElementById('customPrice').value = '';
+    }
+}
+
+function calcPrice(items){
+    let price = BASE;
+
+    if(items.includes('นูเทลล่า') && items.includes('ฝอยทอง')) price = 15;
+    if(items.includes('ข้าวโพด') && items.includes('ยำสาหร่าย')) price = 15;
+
+    const hasEgg = items.includes('ไข่');
+    const hasRoe = items.includes('ซอสไข่กุ้ง');
+    const hasYum = items.includes('ยำสาหร่าย');
+    const hasCorn = items.includes('ข้าวโพด');
+
+    if(hasEgg) price += 5;
+    if(hasRoe) price += 5;
+
+    const SPECIAL_GROUP = ['ยำสาหร่าย','ข้าวโพด'];
+
+const selectedSpecial = items.filter(i => SPECIAL_GROUP.includes(i));
+
+if(selectedSpecial.length){
+    const others = items.filter(i => !SPECIAL_GROUP.includes(i));
+    const hasOtherExtra = others.some(
+        i => i !== 'ไข่' && i !== 'ซอสไข่กุ้ง'
+    );
+
+    if(hasOtherExtra){
+        price += 5;
+    }
+}
+
+    return price;
+}
+
+
+function addPiece() {
+    const items=[...document.querySelectorAll('#fillingsBox input:checked')].map(i=>i.value);
+    const qty = parseInt(document.getElementById('pieceQty').value) || 1;
+    if(!items.length) return showToast('เลือกไส้ก่อนนะ','error');
+    const price = calcPrice(items);
+    const found = currentPieces.find(p => JSON.stringify(p.items) === JSON.stringify(items));
+    if(found) found.qty += qty;
+    else currentPieces.push({ items, price, qty });
+    resetInputs();
+}
+
+function addCustomPiece() {
+    const name = document.getElementById('customName').value.trim();
+    const price = parseInt(document.getElementById('customPrice').value);
+    const qty = parseInt(document.getElementById('pieceQty').value) || 1;
+    if(!name || isNaN(price)) return showToast('ระบุชื่อและราคาให้ครบ','error');
+    currentPieces.push({ items: [name], price, qty });
+    toggleCustomArea(false);
+    resetInputs();
+}
+
+function resetInputs() {
+    document.getElementById('pieceQty').value = 1;
+    document.querySelectorAll('#fillingsBox input').forEach(c=>c.checked=false);
+    renderCurrent();
+}
+
+function changeQty(step){
+    const input = document.getElementById('pieceQty');
+    let v = parseInt(input.value) || 1;
+    v = Math.max(1, v + step);
+    input.value = v;
+}
+
+function renderCurrent(){
+    const currentBillDiv = document.getElementById('currentBill');
+    currentBillDiv.innerHTML='';
+    let total=0;
+    let totalQty = 0;
+    if(currentPieces.length === 0) {
+        currentBillDiv.innerHTML = '<div style="text-align:center; color:#ccc; padding:5px; font-size:0.8rem;">ยังไม่มีรายการในบิล</div>';
+    }
+    currentPieces.forEach((p,i)=>{
+        const lineTotal = p.price * p.qty;
+        total += lineTotal;
+totalQty += p.qty || 1;
+        currentBillDiv.innerHTML+=`
+            <div class="current-item">
+                <div class="item-row-top">
+                    <b style="font-size:1rem;">${p.items.join('+')}</b>
+                    <button class="btn btn-outline btn-sm" style="color:red; border:none;" onclick="pDel(${i})">ลบ</button>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button class="btn btn-outline btn-sm" style="width:25px; height:25px; padding:0" onclick="pQty(${i},-1)">-</button>
+                        <b>${p.qty}</b>
+                        <button class="btn btn-outline btn-sm" style="width:25px; height:25px; padding:0" onclick="pQty(${i},1)">+</button>
+                    </div>
+                    <div class="price-input-group">
+                        <small>฿</small><input type="number" value="${p.price}" onchange="pUpdate(${i},this.value)">
+                    </div>
+                </div>
+            </div>`;
+    });
+currentBillDiv.innerHTML += `
+    <div style="text-align:center; font-size:1rem; color:#666; margin-top:6px;">
+        ทั้งหมด ${totalQty} ชิ้น
+    </div>
+`;
+    document.getElementById('mainSaveBtn').innerText = `💾 บันทึกและเปิดบิล (${total}.-)`;
+}
+
+function pUpdate(i,v){currentPieces[i].price=parseInt(v)||0;renderCurrent();}
+function pDel(i){currentPieces.splice(i,1);renderCurrent();}
+function pQty(i,d){currentPieces[i].qty = Math.max(1, (currentPieces[i].qty||1)+d); renderCurrent();}
+
+// ฟังก์ชันบันทึกบิล
+function saveBill(){
+    if(currentPieces.length === 0) return showToast('เพิ่มรายการก่อนบันทึกนะ','error');
+    
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const noteEl = document.getElementById('billNote');
+    
+    if(editingBillNo !== null){
+        const b = bills.find(x => x.billNo === editingBillNo);
+        if(b){ 
+            b.pieces = JSON.parse(JSON.stringify(currentPieces)); 
+            b.note = noteEl.value; 
+        }
+        editingBillNo = null;
+    } else {
+        bills.push({
+            billNo: billCounter++, 
+            date: new Date().toISOString().slice(0,10),
+            time: new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
+            pieces: JSON.parse(JSON.stringify(currentPieces)), 
+            note: noteEl.value, 
+            status: 'doing',
+            paid: false,
+            synced: false
+        });
+        localStorage.setItem('billCounter', billCounter);
+    }
+    
+    localStorage.setItem(KEY, JSON.stringify(bills));
+    currentPieces = []; 
+    noteEl.value = ''; 
+    renderCurrent(); 
+    renderBills(); 
+    showToast('บันทึกบิลสำเร็จ!','success');
+}
+
+function renderBills(){
+    const editHint = document.getElementById('editHint');
+    const billList = document.getElementById('billList');
+    const summaryBox = document.getElementById('summaryBox');
+    const exportBox = document.getElementById('exportBox');
+    const todayTotal = document.getElementById('todayTotal');
+
+    editHint.innerText = editingBillNo !== null ? `✏️ กำลังแก้ไขบิล #${editingBillNo}` : '';
+    document.getElementById('tabDoing').classList.toggle('active',view==='doing');
+    document.getElementById('tabDone').classList.toggle('active',view==='done');
+    document.getElementById('tabSummary').classList.toggle('active', view==='summary');
+
+    summaryBox.innerHTML = ''; billList.innerHTML=''; exportBox.innerHTML=''; todayTotal.innerHTML='';
+    if(view === 'summary'){ renderSummary(); return; }
+
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status===view);
+    if(view === 'done') renderTodayTotal();
+
+    bills.sort((a,b) => view==='doing' ? a.billNo - b.billNo : b.billNo - a.billNo).forEach(b=>{
+        const sum = b.pieces.reduce((s,p)=> s + (parseInt(p.price)*(p.qty||1)), 0);
+        const active = activeBillNo === b.billNo;
+const qtySum = b.pieces.reduce((s,p)=> s + (p.qty||1), 0);
+        billList.innerHTML+=`
+            <div class="card" onclick="selectBill(${b.billNo})" style="border-left:5px solid ${view==='doing'?'var(--primary)':'var(--success)'}">
+                <div class="bill-header">
+                    <span style="font-size:1.1rem; color:#888;">#${b.billNo} • ${b.time}  </span>
+${(view==='doing' && b.paid) ?  '  💰 จ่ายแล้ว' : ''}
+                    <b style="color:var(--primary); font-size:1.3rem;">
+  ${qtySum} ชิ้น
+  <span style="margin:0 10px;">•</span>
+  ${sum}.-
+</b>
+
+                </div>
+                <div style="font-size:1.8rem; line-height:1.7;">
+                    ${b.pieces.map(p=>`<div>${p.items.join('+')} x${p.qty||1} <span style="float:right; color:#888; font-size:1.4rem;">${parseInt(p.price)*(p.qty||1)}฿</span></div>`).join('')}
+                </div>
+                ${b.note?`<div class="note1"style="margin-top:8px; padding:5px; background:#fff9c4; border-radius:5px; font-size:1.2rem;">📝 ${b.note}</div>`:''}
+                ${active?`
+<div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
+    
+    <button class="btn btn-outline btn-sm" style="flex:1"
+        onclick="editBill(${b.billNo});event.stopPropagation()">✏️ แก้ไข</button>
+
+    <button class="btn btn-danger btn-sm" style="flex:1; background:#fff5f5; color:red; border:none;"
+        onclick="deleteBill(${b.billNo});event.stopPropagation()">🗑️ ลบ</button>
+
+    ${b.status==='doing'?`
+        ${(view==='doing' && b.status==='doing') ? `
+    <button class="btn btn-sm"
+        style="flex:1; background:${b.paid?'#d4edda':'#fff3cd'};"
+        onclick="togglePaid(${b.billNo});event.stopPropagation()">
+        ${b.paid?'ยังไม่จ่าย':'✅ จ่ายแล้ว'}
+    </button>
+` : ''}
+
+
+        <button class="btn btn-finish-large" style="flex:3"
+            onclick="finishBill(${b.billNo});event.stopPropagation()">✅ เสร็จแล้ว</button>
+    `:''}
+
+</div>`:''}
+            </div>`;
+    });
+
+    if(view==='done'){
+        exportBox.innerHTML=`
+            <div class="card" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+<button id="syncBtn" onclick="uploadBillsToFirebase(this)" class="sync-btn">
+  ⬆️ อัพข้อมูล
+</button>
+<button id="pullBtn" onclick="loadTodayBillsFromFirebase(this)" class="sync-btn pull">
+  ⬇️ ดึงข้อมูลวันนี้
+</button>
+
+                <input type="file" id="importExcel" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+                <button class="btn btn-outline btn-sm" onclick="document.getElementById('importExcel').click()">📥 นำเข้า Excel</button>
+                <button class="btn btn-outline btn-sm" onclick="exportExcel()">📤 ส่งออก Excel</button>
+                <button class="btn btn-outline btn-sm" style="grid-column: span 2; color:red;" onclick="clearDoneBills()">🗑️ ล้างบิลที่เสร็จแล้ว</button>
+                <button class="btn btn-sm" style="grid-column: span 2; background:#333; color:white; margin-top:10px;" onclick="closeShop()">🔒 ปิดร้าน (ล้างระบบ)</button>
+            </div>`;
+    }
+}
+
+function renderTodayTotal(){
+    const today = new Date().toISOString().slice(0,10);
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b => b.status === 'done' && b.date === today);
+    let totalMoney = 0;
+    bills.forEach(b=> b.pieces.forEach(p=> totalMoney += parseInt(p.price) * (p.qty || 1)));
+    document.getElementById('todayTotal').innerHTML = `
+        <div style="display:flex; gap:0px; margin-bottom:0px;">
+            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">บิลวันนี้</small><b>${bills.length}</b></div>
+            <div class="card" style="flex:1; margin-bottom:0; text-align:center;"><small class="section-title">รวมเงิน</small><b style="color:var(--success)">${totalMoney}.-</b></div>
+        </div>`;
+}
+
+function renderSummary(){
+
+    // ✅ ดึงข้อมูลครั้งเดียวพอ
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b => b.status === 'done');
+
+    const summaryBox = document.getElementById('summaryBox');
+
+    if(!bills.length){
+        summaryBox.innerHTML = `
+            <div class="card" style="text-align:center; padding:30px; color:#ccc;">
+                ยังไม่มีข้อมูล
+            </div>`;
+        return;
+    }
+
+    // ✅ ใช้วันที่จากข้อมูลจริง
+    const summaryDate = bills[0]?.date || '-';
+
+    let totalMoney = 0, totalBills = bills.length, totalPieces = 0, itemMap = {};
+
+    bills.forEach(b=>{
+        b.pieces.forEach(p=>{
+            const qty = parseInt(p.qty) || 1;
+            const key = p.items.join('+');
+            const price = parseInt(p.price);
+
+            totalMoney += price * qty;
+            totalPieces += qty;
+
+            if(!itemMap[key]) itemMap[key] = { qty:0, money:0 };
+            itemMap[key].qty += qty;
+            itemMap[key].money += price * qty;
+        });
+    });
+
+    const sortedItems = Object.entries(itemMap).sort((a,b)=> {
+        if(b[1].qty !== a[1].qty) return b[1].qty - a[1].qty;
+        return b[1].money - a[1].money;
+    });
+
+    // ✅ HTML ใช้ summaryDate
+    let html = `<div class="card" id="summaryPrint" style="padding:20px;">
+        <h3 style="text-align:center; margin:0;">สรุปยอดขาย</h3>
+        <p style="text-align:center; color:#888; font-size:0.8rem; margin-bottom:15px;">
+            วันที่ ${summaryDate}
+        </p>
+    
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+            <small class="section-title" style="font-size:0.7rem;">บิลทั้งหมด</small>
+            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--secondary);">${totalBills}</b>
+        </div>
+        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+            <small class="section-title" style="font-size:0.7rem;">จำนวนชิ้น</small>
+            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--primary);">${totalPieces}</b>
+        </div>
+        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+            <small class="section-title" style="font-size:0.7rem;">รวมเงิน</small>
+            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--success);">${totalMoney}</b>
         </div>
     </div>
 
-    <div class="tabs">
-        <div id="tabDoing" class="tab active" onclick="switchView('doing')">กำลังทำ 🔥</div>
-        <div id="tabDone" class="tab" onclick="switchView('done')">เสร็จแล้ว ✅</div>
-        <div id="tabSummary" class="tab" onclick="switchView('summary')">สรุปยอด 📊</div>
-    </div>
+    <span class="section-title">ลำดับไส้ขายดี</span>`;
+    
+    sortedItems.forEach(([name,v],i)=>{
+        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+        html += `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f9f9f9; font-size:0.95rem;">
+            <span>${name} ${medal}</span><span>${v.qty} ชิ้น | ${v.money}฿</span>
+        </div>`;
+    });
+    html += `</div><div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 ส่งออกExcel</button>
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ ส่งออกรูปภาพ</button>
+    </div>`;
+    summaryBox.innerHTML = html;
+}
 
-    <div id="billList"></div>
-    <div id="summaryBox" class="card" style="display:none;"></div>
-</div>
+function importExcel(input){
+    const file = input.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e=>{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data,{type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws,{header:1}); rows.shift();
+        let billsMap = {};
+        rows.forEach(r=>{
+            const [date,billNo,items,qty,price,total,note] = r; if(!billNo) return;
+            if(!billsMap[billNo]) billsMap[billNo]={ billNo:Number(billNo), date, time: new Date().toLocaleTimeString('th-TH'), status:'done', note:note||'', pieces:[] };
+            billsMap[billNo].pieces.push({ items: String(items).split('+'), qty: Number(qty)||1, price: Number(price)||0 });
+        });
+        const currentBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+        const merged = [...currentBills.filter(b=>!billsMap[b.billNo]), ...Object.values(billsMap)];
+        localStorage.setItem(KEY, JSON.stringify(merged));
+        syncBillCounter(); renderBills(); showToast('นำเข้าข้อมูลสำเร็จ','success');
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function syncBillCounter(){ 
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
+    const maxNo = bills.reduce((m,b)=>Math.max(m,parseInt(b.billNo)||0),0); 
+    billCounter = maxNo + 1; 
+    localStorage.setItem('billCounter', billCounter); 
+}
+
+function exportExcel(){
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b=>b.status==='done');
+
+    const rows=[['วันที่','เลขบิล','ไส้','จำนวน','ราคาต่อชิ้น','รวม','หมายเหตุ']];
+
+    bills.forEach(b =>
+        b.pieces.forEach(p =>
+            rows.push([
+                b.date,
+                b.billNo,
+                p.items.join('+'),
+                p.qty,
+                p.price,
+                p.price*p.qty,
+                b.note||''
+            ])
+        )
+    );
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'orders');
+
+    // 👉 ต่อวันที่ท้ายชื่อไฟล์
+    const today = bills[0]?.date || 'no-date';
+    XLSX.writeFile(wb, `tokyo_orders_${today}.xlsx`);
+}
+
+
+function exportSummaryExcel(){ 
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b=>b.status==='done');
+    if(!bills.length) return; 
+    let map = {}; 
+    bills.forEach(b=> b.pieces.forEach(p=>{ 
+        const k = p.items.join('+'); 
+        if(!map[k]) map[k]={q:0,m:0}; 
+        map[k].q+=p.qty; map[k].m+=(p.price*p.qty); 
+    })); 
+    const rows = [['ไส้','จำนวนชิ้น','ยอดรวม']]; 
+    Object.entries(map).sort((a,b)=>b[1].q-a[1].q).forEach(([k,v])=> rows.push([k,v.q,v.m])); 
+    const ws = XLSX.utils.aoa_to_sheet(rows); 
+    const wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb,ws,'summary'); 
+    XLSX.writeFile(wb,'summary.xlsx'); 
+}
+
+function exportSummaryImage(){ 
+    const box = document.getElementById('summaryPrint'); 
+
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
+        .filter(b => b.status === 'done');
+
+    if(!bills.length) return;
+
+    const billDate = bills[0].date; // วันที่ของข้อมูลบิล
+
+    html2canvas(box,{scale:2}).then(canvas=>{ 
+        const link = document.createElement('a'); 
+        link.download = `summary-${billDate}.png`; 
+        link.href = canvas.toDataURL(); 
+        link.click(); 
+    }); 
+}
+
+
+function editBill(no){ 
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
+    const b = bills.find(x=>x.billNo===no); 
+    if(!b) return; 
+    currentPieces = JSON.parse(JSON.stringify(b.pieces)); 
+    document.getElementById('billNote').value = b.note || ''; 
+    editingBillNo = no; 
+    view = 'doing'; 
+    renderCurrent(); 
+    renderBills(); 
+    window.scrollTo(0,0); 
+}
+
+function finishBill(no){ 
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]'); 
+    const b = bills.find(x=>x.billNo===no); 
+    if(!b) return; 
+    b.status='done'; 
+    localStorage.setItem(KEY, JSON.stringify(bills));
+    renderBills(); 
+    showToast('บิลสำเร็จ!','success'); 
+}
+
+function selectBill(no){ activeBillNo = activeBillNo===no ? null : no; renderBills(); }
+function deleteBill(no){ 
+    if(confirm(`ลบบิล #${no}?`)){ 
+        const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+        const filtered = bills.filter(b=>b.billNo!==no);
+        localStorage.setItem(KEY, JSON.stringify(filtered));
+        activeBillNo=null; 
+        renderBills(); 
+    } 
+}
+function clearDoneBills(){ 
+    if(confirm('ล้างบิลที่เสร็จแล้วทั้งหมด?')){ 
+        const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+        const filtered = bills.filter(b=>b.status!=='done');
+        localStorage.setItem(KEY, JSON.stringify(filtered));
+        syncBillCounter(); 
+        renderBills(); 
+    } 
+}
+
+function showToast(msg,type){ 
+    const t=document.getElementById('toast'); 
+    t.className='toast show '+type; 
+    t.innerText=msg; 
+    setTimeout(()=>t.className='toast',2000); 
+}
+
+function closeShop(){ 
+    if(prompt('รหัสปิดร้าน?')==='2501'){ 
+        exportExcel(); 
+        localStorage.removeItem(KEY); 
+        localStorage.setItem('billCounter','1'); 
+        location.reload(); 
+    } 
+}
+function togglePaid(no){
+    const bills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const b = bills.find(x => x.billNo === no);
+    if(!b) return;
+
+    b.paid = !b.paid;
+    localStorage.setItem(KEY, JSON.stringify(bills));
+    renderBills();
+}
+const toggleBtn = document.getElementById('darkToggle');
+
+toggleBtn.onclick = () => {
+    document.body.classList.toggle('dark');
+
+    toggleBtn.textContent =
+        document.body.classList.contains('dark') ? '☀️' : '🌙';
+};
+
+let isBillOpened = false;
+
+function toggleBillView(){
+    const bill = document.getElementById('billTabs1');
+    const btn  = document.getElementById('floatingBillBtn');
+    if(!bill || !btn) return;
+
+    if(!isBillOpened){
+        const offset = 25; // เว้นด้านบน กันปุ่มลอยทับ
+        const y =
+            bill.getBoundingClientRect().top +
+            window.pageYOffset -
+            offset;
+
+        window.scrollTo({
+            top: y,
+            behavior: 'smooth'
+        });
+
+        btn.textContent = '▲';   // โหมดบิล
+        isBillOpened = true;
+    }else{
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+
+        btn.textContent = '▼';   // โหมดปกติ
+        isBillOpened = false;
+    }
+}
+
+
+// Initial Render
+renderBills(); 
+renderCurrent();
+
+</script>
+<button id="floatingBillBtn" onclick="toggleBillView()">▼</button>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCx6SGBBh979y6cjyOL75f5PdSr8AZkz0g",
+    authDomain: "tokyo-order-app.firebaseapp.com",
+    projectId: "tokyo-order-app",
+    storageBucket: "tokyo-order-app.firebasestorage.app",
+    messagingSenderId: "411815226779",
+    appId: "1:411815226779:web:373e1ca32daaac264cc53e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  window.db = getFirestore(app);
+</script>
 
 <script type="module">
-    // --- ตั้งค่า Firebase & ตัวแปรหลัก ---
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, setDoc, doc, query, where, orderBy, deleteDoc, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import {
+    collection,
+    doc,
+    setDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyCx6SGBBh979y6cjyOL75f5PdSr8AZkz0g",
-        authDomain: "tokyo-order-app.firebaseapp.com",
-        projectId: "tokyo-order-app",
-    };
+  window.uploadBillsToFirebase = async function(btn){
+    if(btn.disabled) return;
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    window.db = db;
-    window.fbFirestore = { doc, setDoc, collection, getDocs, query, where, orderBy };
+    const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
 
-    const KEY = 'TOKYO_BILLS_LOCAL';
-    let currentPieces = [];
-    let view = 'doing';
-    const BASE = 10;
-    const fillings = ['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิษซ่า','ฮอตดอก','หมูสับ','ปูอัด','ไข่','ชีสยืด'];
+    // ✅ อัพทุกบิลที่เสร็จแล้ว และยังไม่ synced
+    const targetBills = allBills.filter(
+  b => b.status === 'done' && b.synced !== true
+);
 
-    // --- ระบบเช็คเน็ต ---
-    function isOnline() {
-        if (!navigator.onLine) {
-            Swal.fire('ไม่มีอินเทอร์เน็ต', 'กรุณาเปิดเน็ตเพื่อใช้งานส่วนคลาวด์ครับ', 'warning');
-            return false;
-        }
-        return true;
+    if(!targetBills.length){
+      alert('ไม่มีบิลใหม่');
+      return;
     }
 
-    function updateNetworkUI() {
-        const btns = document.querySelectorAll('.btn-sync-group button');
-        btns.forEach(b => navigator.onLine ? b.classList.remove('offline-mode') : b.classList.add('offline-mode'));
-    }
-    window.addEventListener('online', updateNetworkUI);
-    window.addEventListener('offline', updateNetworkUI);
-    updateNetworkUI();
+    btn.disabled = true;
+    btn.classList.add('loading');
+    const oldText = btn.textContent;
+    btn.textContent = 'กำลังอัพ...';
 
-    // --- ฟังก์ชันจัดการออเดอร์ ---
-    const fillingsBox = document.getElementById('fillingsBox');
-    fillingsBox.innerHTML = fillings.map(f => `<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
+    try{
+      for(const bill of targetBills){
+        const docId = `${bill.date}_${bill.billNo}`;
+        const ref = doc(
+        collection(window.db,'bills'),
+        docId
+        );
 
-    window.changeGlobalQty = (val) => {
-        const input = document.getElementById('pieceQty');
-        let v = parseInt(input.value) + val;
-        if(v < 1) v = 1;
-        input.value = v;
-    };
+        await setDoc(ref,{
+          ...bill,
+          syncedAt: serverTimestamp()
+        });
 
-    window.addPiece = () => {
-        const checked = [...document.querySelectorAll('#fillingsBox input:checked')].map(i => i.value);
-        const qty = parseInt(document.getElementById('pieceQty').value);
-        if(!checked.length) return Swal.fire('ลืมเลือกไส้หรือเปล่า?', '', 'warning');
-        
-        let price = BASE;
-        if(checked.includes('ไข่')) price += 5;
-        if(checked.includes('ชีสยืด')) price += 10;
+        // ✅ mark ว่าอัพแล้ว
+        bill.synced = true;
+      }
 
-        currentPieces.push({ items: checked, price: price, qty: qty, synced: false });
-        
-        document.querySelectorAll('#fillingsBox input').forEach(c => c.checked = false);
-        document.getElementById('pieceQty').value = 1;
-        renderCurrent();
-    };
+      // ✅ merge กลับครบทุกบิล (ไม่ทำหาย)
+      localStorage.setItem(KEY, JSON.stringify(allBills));
 
-    function renderCurrent() {
-        const box = document.getElementById('currentBill');
-        const total = currentPieces.reduce((sum, p) => sum + (p.price * p.qty), 0);
-        const count = currentPieces.reduce((sum, p) => sum + p.qty, 0);
-        
-        document.getElementById('currentBillHeader').innerText = `รายการในบิล (${count} ชิ้น)`;
-        document.getElementById('mainSaveBtn').innerText = `💾 บันทึกและเปิดบิล (${total}.-)`;
-        
-        box.innerHTML = currentPieces.map((p, i) => `
-            <div class="current-item">
-                <span>${p.items.join('+')} x ${p.qty}</span>
-                <button onclick="removePiece(${i})" style="border:none; color:red; background:none;">✕</button>
-            </div>
-        `).join('');
+      alert(`อัพข้อมูลแล้ว ${targetBills.length} บิล`);
+    }catch(err){
+      console.error(err);
+      alert('อัพข้อมูลไม่สำเร็จ');
     }
 
-    window.removePiece = (i) => { currentPieces.splice(i, 1); renderCurrent(); };
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = oldText;
+  }
+</script>
 
-    // --- ฟังก์ชันบันทึกข้อมูล (ลง Local & Firebase) ---
-    window.saveBill = async () => {
-        if(!currentPieces.length) return;
-        const billId = crypto.randomUUID();
-        const today = new Date().toISOString().slice(0,10);
-        
-        const billData = {
-            id: billId,
-            pieces: currentPieces,
-            note: document.getElementById('billNote').value,
-            status: 'doing',
-            date: today,
-            createdAt: new Date().toISOString(),
-            synced: false
-        };
+<script type="module">
+  import {
+    collection,
+    getDocs,
+    query,
+    where
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // เซฟลง Local ก่อนเสมอ
-        const local = JSON.parse(localStorage.getItem(KEY) || '[]');
-        local.push(billData);
-        localStorage.setItem(KEY, JSON.stringify(local));
 
-        currentPieces = [];
-        document.getElementById('billNote').value = '';
-        renderCurrent();
-        renderBills();
-        Swal.fire({ title: 'จดออเดอร์แล้ว!', icon: 'success', timer: 1000, showConfirmButton: false });
-    };
+  window.loadTodayBillsFromFirebase = async function(btn){
+    if(btn.disabled) return;
 
-    // --- ฟังก์ชันอัปโหลด/ดึงข้อมูล (Cloud) ---
-    window.uploadAllUnsynced = async (btn) => {
-        if(!isOnline()) return;
-        const local = JSON.parse(localStorage.getItem(KEY) || '[]');
-        const targets = local.filter(b => !b.synced);
-        if(!targets.length) return Swal.fire('ไม่มีข้อมูลค้างซิงค์', '', 'info');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    const oldText = btn.textContent;
+    btn.textContent = 'กำลังดึง...';
 
-        btn.disabled = true;
-        try {
-            for(let b of targets) {
-                await setDoc(doc(db, 'bills', b.id), b);
-                b.synced = true;
-            }
-            localStorage.setItem(KEY, JSON.stringify(local));
-            Swal.fire('อัปโหลดสำเร็จ!', '', 'success');
-            renderBills();
-        } catch(e) { Swal.fire('ผิดพลาด', e.message, 'error'); }
-        btn.disabled = false;
-    };
+    try{
+      const today = new Date().toISOString().slice(0,10);
 
-    window.loadTodayBillsFromFirebase = async (btn) => {
-        if(!isOnline()) return;
-        btn.disabled = true;
-        try {
-            const today = new Date().toISOString().slice(0,10);
-            const q = query(collection(db, 'bills'), where('date', '==', today));
-            const snap = await getDocs(q);
-            const cloudBills = snap.docs.map(d => ({...d.data(), synced: true}));
-            
-            localStorage.setItem(KEY, JSON.stringify(cloudBills));
-            renderBills();
-            Swal.fire('ดึงข้อมูลวันนี้มาแล้ว', '', 'success');
-        } catch(e) { Swal.fire('ผิดพลาด', e.message, 'error'); }
-        btn.disabled = false;
-    };
+const q = query(
+  collection(window.db,'bills'),
+  where('date','==',today)
+);
 
-    window.renderBills = () => {
-        const list = document.getElementById('billList');
-        const local = JSON.parse(localStorage.getItem(KEY) || '[]');
-        const filtered = local.filter(b => b.status === view).reverse();
-        
-        list.innerHTML = filtered.map(b => `
-            <div class="card">
-                <div style="display:flex; justify-content:space-between;">
-                    <b>ออเดอร์ #${b.id.slice(0,4)}</b>
-                    <span style="color:${b.synced ? 'green':'gray'}">${b.synced ? '☁️':'⏳'}</span>
-                </div>
-                <div>${b.pieces.map(p => `• ${p.items.join('+')} x${p.qty}`).join('<br>')}</div>
-                ${b.note ? `<small>📝 ${b.note}</small>` : ''}
-            </div>
-        `).join('');
-    };
+const snap = await getDocs(q);
+const pulledBills = snap.docs.map(d => ({ ...d.data(), synced:true }));
 
-    window.switchView = (v) => {
-        view = v;
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('tab' + v.charAt(0).toUpperCase() + v.slice(1)).classList.add('active');
-        renderBills();
-    };
+const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
 
-    document.getElementById('darkToggle').onclick = () => document.body.classList.toggle('dark');
-    renderBills();
+// เก็บบิลที่ยังไม่ done ไว้
+const merged = [
+  ...localBills.filter(b => b.status !== 'done'),
+  ...pulledBills
+];
+
+localStorage.setItem(KEY, JSON.stringify(merged));
+renderBills();
+
+alert(`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`);
+    }catch(err){
+      console.error(err);
+      alert('ดึงข้อมูลไม่สำเร็จ');
+    }
+
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = oldText;
+  }
 </script>
 
 </body>
