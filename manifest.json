@@ -3,7 +3,7 @@
   "name": "Ma Kin Tokyo Order Pro",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/1041/1041883.png",
+      "src": "icon-512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
@@ -14,3 +14,4 @@
   "scope": "./",
   "theme_color": "#FF9800"
 }
+
