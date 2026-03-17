@@ -579,24 +579,34 @@ function renderTodayTotal(){
 }
 
 function renderSummary(){
+    const summaryBox = document.getElementById('summaryBox');
+    const dashboardUrl = 'https://rachata-2025-source.github.io/tokyo-dashboard/'; // ⚠️ อย่าลืมเปลี่ยน URL
 
-    // ✅ ดึงข้อมูลครั้งเดียวพอ
+    // 1. สร้าง HTML ส่วนของปุ่ม Dashboard ไว้รอก่อนเลย
+    let dashboardBtnHtml = `
+        <button onclick="window.open('${dashboardUrl}', '_blank')" 
+                style="width:100%; margin-bottom:15px; padding:12px; background:#E3F2FD; color:#1565C0; 
+                       border:1px solid #90CAF9; border-radius:12px; font-weight:bold; cursor:pointer;
+                       display:flex; align-items:center; justify-content:center; gap:8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            📊 ดูข้อมูลยอดขายทั้งหมด (Dashboard)
+        </button>
+    `;
+
+    // ดึงข้อมูล
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]')
         .filter(b => b.status === 'done');
 
-    const summaryBox = document.getElementById('summaryBox');
-
+    // 2. ถ้าไม่มีข้อมูล ให้แสดงปุ่ม Dashboard คู่กับข้อความ "ยังไม่มีข้อมูล"
     if(!bills.length){
-        summaryBox.innerHTML = `
+        summaryBox.innerHTML = dashboardBtnHtml + `
             <div class="card" style="text-align:center; padding:30px; color:#ccc;">
-                ยังไม่มีข้อมูล
+                ยังไม่มีข้อมูลการขายในวันนี้
             </div>`;
         return;
     }
 
-    // ✅ ใช้วันที่จากข้อมูลจริง
+    // --- ส่วนที่มีข้อมูลปกติ ---
     const summaryDate = bills[0]?.date || '-';
-
     let totalMoney = 0, totalBills = bills.length, totalPieces = 0, itemMap = {};
 
     bills.forEach(b=>{
@@ -604,10 +614,8 @@ function renderSummary(){
             const qty = parseInt(p.qty) || 1;
             const key = p.items.join('+');
             const price = parseInt(p.price);
-
             totalMoney += price * qty;
             totalPieces += qty;
-
             if(!itemMap[key]) itemMap[key] = { qty:0, money:0 };
             itemMap[key].qty += qty;
             itemMap[key].money += price * qty;
@@ -619,29 +627,30 @@ function renderSummary(){
         return b[1].money - a[1].money;
     });
 
-    // ✅ HTML ใช้ summaryDate
-    let html = `<div class="card" id="summaryPrint" style="padding:20px;">
-        <h3 style="text-align:center; margin:0;">สรุปยอดขาย</h3>
-        <p style="text-align:center; color:#888; font-size:0.8rem; margin-bottom:15px;">
-            วันที่ ${summaryDate}
-        </p>
-    
-    <div style="display:flex; gap:10px; margin-bottom:15px;">
-        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
-            <small class="section-title" style="font-size:0.7rem;">บิลทั้งหมด</small>
-            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--secondary);">${totalBills}</b>
-        </div>
-        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
-            <small class="section-title" style="font-size:0.7rem;">จำนวนชิ้น</small>
-            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--primary);">${totalPieces}</b>
-        </div>
-        <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
-            <small class="section-title" style="font-size:0.7rem;">รวมเงิน</small>
-            <b class="stat-val" style="display:block; font-size:1.2rem; color:var(--success);">${totalMoney}</b>
-        </div>
-    </div>
+    // 3. ถ้ามีข้อมูล ให้แสดงปุ่ม Dashboard ตามด้วยเนื้อหาสรุปปกติ
+    let html = dashboardBtnHtml + `
+        <div class="card" id="summaryPrint" style="padding:20px;">
+            <h3 style="text-align:center; margin:0;">สรุปยอดขาย</h3>
+            <p style="text-align:center; color:#888; font-size:0.8rem; margin-bottom:15px;">
+                วันที่ ${summaryDate}
+            </p>
+            
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+                    <small style="font-size:0.7rem;">บิลทั้งหมด</small>
+                    <b style="display:block; font-size:1.2rem; color:var(--secondary);">${totalBills}</b>
+                </div>
+                <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+                    <small style="font-size:0.7rem;">จำนวนชิ้น</small>
+                    <b style="display:block; font-size:1.2rem; color:var(--primary);">${totalPieces}</b>
+                </div>
+                <div class="card" style="flex:1; margin-bottom:0; text-align:center; padding:10px; background:#f8f9fa; border:1px solid #eee;">
+                    <small style="font-size:0.7rem;">รวมเงิน</small>
+                    <b style="display:block; font-size:1.2rem; color:var(--success);">${totalMoney}</b>
+                </div>
+            </div>
 
-    <span class="section-title">ลำดับไส้ขายดี</span>`;
+            <span class="section-title">ลำดับไส้ขายดี</span>`;
     
     sortedItems.forEach(([name,v],i)=>{
         const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
@@ -649,10 +658,13 @@ function renderSummary(){
             <span>${name} ${medal}</span><span>${v.qty} ชิ้น | ${v.money}฿</span>
         </div>`;
     });
-    html += `</div><div style="display:flex; gap:8px;">
+
+    html += `</div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 ส่งออกExcel</button>
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ ส่งออกรูปภาพ</button>
     </div>`;
+
     summaryBox.innerHTML = html;
 }
 
