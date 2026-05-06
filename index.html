@@ -299,7 +299,7 @@ let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
 let editingBillId=null;
 
-const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด'];
+const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด','20','30','ฟรี'];
 
 const fillingsBox = document.getElementById('fillingsBox');
 fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
@@ -314,6 +314,12 @@ function toggleCustomArea(show) {
 }
 
 function calcPrice(items){
+    // --- ส่วนที่เพิ่มใหม่: ตรวจสอบเงื่อนไขราคาคงที่ ---
+    if (items.includes('ฟรี')) return 0;
+    if (items.includes('30')) return 30;
+    if (items.includes('20')) return 20;
+    // -------------------------------------------
+
     let price = BASE;
 
     if(items.includes('นูเทลล่า') && items.includes('ฝอยทอง')) price = 15;
