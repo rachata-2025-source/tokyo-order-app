@@ -1002,126 +1002,91 @@ renderCurrent();
 </script>
 
 <script type="module">
-// 🆕 ดึง writeBatch เพิ่มเข้ามาเพื่อส่งข้อมูลพร้อมกันเป็นกลุ่ม
-import {
-  collection,
-  doc,
-  writeBatch,
-  increment,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import {
+    collection,
+    doc,
+    setDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-window.uploadBillsToFirebase = async function(btn){
-  if(btn.disabled) return;
+  window.uploadBillsToFirebase = async function(btn){
+if(btn.disabled) return;
 
-  const confirm = await Swal.fire({
-    title:'อัพโหลดข้อมูล?',
-    text:'ต้องการส่งบิลที่เสร็จแล้วไป Firebase',
-    icon:'question',
-    showCancelButton:true,
-    confirmButtonText:'อัพข้อมูล',
-    cancelButtonText:'ยกเลิก'
-  });
+const confirm = await Swal.fire({
+title:'อัพโหลดข้อมูล?',
+text:'ต้องการส่งบิลที่เสร็จแล้วไป Firebase',
+icon:'question',
+showCancelButton:true,
+confirmButtonText:'อัพข้อมูล',
+cancelButtonText:'ยกเลิก'
+});
 
-  if(!confirm.isConfirmed) return;
+if(!confirm.isConfirmed) return;
 
-  if(!window.db){
-    Swal.fire({ icon:'error', title:'ผิดพลาด', text:'ยังไม่ได้เชื่อมต่อ Firebase' });
-    return;
-  }
+const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
 
-  const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
-  const targetBills = allBills.filter(b => b.status === 'done' && b.synced !== true);
+const targetBills = allBills.filter(
+b => b.status === 'done' && b.synced !== true
+);
 
-  if(!targetBills.length){
-    Swal.fire({ icon:'info', title:'ไม่มีบิลใหม่', timer:1500, showConfirmButton:false });
-    return;
-  }
+if(!targetBills.length){
+Swal.fire({
+icon:'info',
+title:'ไม่มีบิลใหม่',
+timer:1500,
+showConfirmButton:false
+});
+return;
+}
 
-  btn.disabled = true;
-  btn.classList.add('loading');
-  const oldText = btn.textContent;
-  btn.textContent = 'กำลังอัพ...';
+btn.disabled = true;
+btn.classList.add('loading');
+const oldText = btn.textContent;
+btn.textContent = 'กำลังอัพ...';
 
-  try {
-    // 🛠️ 1. สร้าง Batch สำหรับมัดรวมคำสั่งส่งทีเดียว
-    const batch = writeBatch(window.db);
-    
-    // 🛠️ 2. สร้างออบเจกต์ชั่วคราวไว้สำหรับรวมยอดสะสมรายเดือน เพื่อประหยัดการเขียน
-    const monthlySummary = {};
+try{
 
-    for(const bill of targetBills){
-      const docId = bill.id;
-      const ref = doc(collection(window.db, 'bills'), docId);
+for(const bill of targetBills){
 
-      // คำนวณยอดเงินรวม สรุปชิ้น ของบิลใบนี้
-      const billRevenue = bill.pieces.reduce((s, p) => s + (parseInt(p.price || 0) * (p.qty || 1)), 0);
-      const billPieces = bill.pieces.reduce((s, p) => s + (p.qty || 1), 0);
-      
-      // 📝 แอดบิลเดี่ยวเข้าตะกร้า Batch (ยังไม่วิ่งไปหาเซิร์ฟเวอร์ทันที)
-      batch.set(ref, {
-        ...bill,
-        syncedAt: serverTimestamp()
-      });
+const docId = bill.id;
 
-      // จัดกลุ่มยอดรวมตาม ปี-เดือน เช่น "2026-06"
-      const monthKey = bill.date ? bill.date.slice(0, 7) : new Date().toISOString().slice(0, 7);
-      
-      if (!monthlySummary[monthKey]) {
-        monthlySummary[monthKey] = { revenue: 0, billsCount: 0, piecesCount: 0 };
-      }
-      
-      // รวมยอดทั้งหมดของรอบนี้ไว้ในเครื่องก่อน
-      monthlySummary[monthKey].revenue += billRevenue;
-      monthlySummary[monthKey].billsCount += 1;
-      monthlySummary[monthKey].piecesCount += billPieces;
+const ref = doc(
+collection(window.db,'bills'),
+docId
+);
 
-      // มาร์คสถานะใน LocalStorage ว่าซิงค์แล้ว
-      bill.synced = true;
-    }
+await setDoc(ref,{
+...bill,
+syncedAt: serverTimestamp()
+});
 
-    // 🛠️ 3. บันทึกยอดสะสมรายเดือนลงใน Batchด้วยระบบผสานข้อมูล (Safe Set with Merge)
-    for (const monthKey in monthlySummary) {
-      const monthlyRef = doc(collection(window.db, 'monthly_stats'), monthKey);
-      const data = monthlySummary[monthKey];
+bill.synced = true;
+}
 
-      // ใช้วิธี set แบบ merge: true ร่วมกับ increment จะปลอดภัยที่สุด 
-      // รองรับทั้งการสร้างเดือนใหม่วันแรก และการบวกยอดสะสมต่อจากของเดิม
-      batch.set(monthlyRef, {
-        monthKey: monthKey,
-        revenue: increment(data.revenue),
-        billsCount: increment(data.billsCount),
-        piecesCount: increment(data.piecesCount),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    } catch (e) {
-        // 💡 หมายเหตุ: ในโหมด Batch คำสั่ง update อาจไม่มีผลถ้าไม่มีเอกสารอยู่ก่อน 
-        // แต่เพื่อความปลอดภัย หากคลาวด์ยังไม่มีเดือนนี้ ให้ใช้คำสั่ง setDoc แยกแทน หรือปล่อยให้ลอจิกหน้า Dashboard สร้างให้ตอนเปิดดูได้ครับ
-        // (แนะนำดีที่สุดคือตั้งต้นเขียนสถิติรายเดือนด้วยสิทธิ์ตั้งต้น)
-      }
-    }
+localStorage.setItem(KEY, JSON.stringify(allBills));
 
-    // 🚀 4. ส่งข้อมูลทั้งหมดขึ้น Firebase พร้อมกันในยิงเดียว (Single Network Request)
-    await batch.commit();
+Swal.fire({
+icon:'success',
+title:`อัพข้อมูลแล้ว ${targetBills.length} บิล`,
+timer:1600,
+showConfirmButton:false
+});
 
-    // 💾 บันทึกกลับลงเครื่องเมื่อสำเร็จ
-    localStorage.setItem(KEY, JSON.stringify(allBills));
+}catch(err){
 
-    Swal.fire({
-      icon:'success',
-      title:`อัพข้อมูลแล้ว ${targetBills.length} บิล`,
-      timer:1600,
-      showConfirmButton:false
-    });
+console.error(err);
 
-  } catch(err) {
-    console.error(err);
-    Swal.fire({ icon:'error', title:'อัพข้อมูลไม่สำเร็จ', text: err.message });
-  }
+Swal.fire({
+icon:'error',
+title:'อัพข้อมูลไม่สำเร็จ'
+});
 
-  btn.disabled = false;
-  btn.classList.remove('loading');
-  btn.textContent = oldText;
+}
+
+btn.disabled = false;
+btn.classList.remove('loading');
+btn.textContent = oldText;
+
 }
 </script>
 
