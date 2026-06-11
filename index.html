@@ -1080,20 +1080,21 @@ window.uploadBillsToFirebase = async function(btn){
       bill.synced = true;
     }
 
-    // 🛠️ 3. บันทึกยอดสะสมรายเดือนลงใน Batch (จะวนลูปตามจำนวน "เดือน" ไม่ใช่จำนวนบิล)
+    // 🛠️ 3. บันทึกยอดสะสมรายเดือนลงใน Batchด้วยระบบผสานข้อมูล (Safe Set with Merge)
     for (const monthKey in monthlySummary) {
       const monthlyRef = doc(collection(window.db, 'monthly_stats'), monthKey);
       const data = monthlySummary[monthKey];
 
-      try {
-        // อัปเดตยอดเพิ่มเข้าไปในคอลเลกชันสรุปรายเดือน
-        batch.update(monthlyRef, {
-          revenue: increment(data.revenue),
-          billsCount: increment(data.billsCount),
-          piecesCount: increment(data.piecesCount),
-          updatedAt: serverTimestamp()
-        });
-      } catch (e) {
+      // ใช้วิธี set แบบ merge: true ร่วมกับ increment จะปลอดภัยที่สุด 
+      // รองรับทั้งการสร้างเดือนใหม่วันแรก และการบวกยอดสะสมต่อจากของเดิม
+      batch.set(monthlyRef, {
+        monthKey: monthKey,
+        revenue: increment(data.revenue),
+        billsCount: increment(data.billsCount),
+        piecesCount: increment(data.piecesCount),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
         // 💡 หมายเหตุ: ในโหมด Batch คำสั่ง update อาจไม่มีผลถ้าไม่มีเอกสารอยู่ก่อน 
         // แต่เพื่อความปลอดภัย หากคลาวด์ยังไม่มีเดือนนี้ ให้ใช้คำสั่ง setDoc แยกแทน หรือปล่อยให้ลอจิกหน้า Dashboard สร้างให้ตอนเปิดดูได้ครับ
         // (แนะนำดีที่สุดคือตั้งต้นเขียนสถิติรายเดือนด้วยสิทธิ์ตั้งต้น)
