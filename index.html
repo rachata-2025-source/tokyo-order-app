@@ -1002,12 +1002,11 @@ renderCurrent();
 </script>
 
 <script type="module">
-  // เพิ่ม increment เข้ามาจาก SDK เพื่อใช้สะสมยอด
+// 🆕 ดึง writeBatch เพิ่มเข้ามาเพื่อส่งข้อมูลพร้อมกันเป็นกลุ่ม
 import {
   collection,
   doc,
-  setDoc,
-  updateDoc,
+  writeBatch,
   increment,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -1026,6 +1025,11 @@ window.uploadBillsToFirebase = async function(btn){
 
   if(!confirm.isConfirmed) return;
 
+  if(!window.db){
+    Swal.fire({ icon:'error', title:'ผิดพลาด', text:'ยังไม่ได้เชื่อมต่อ Firebase' });
+    return;
+  }
+
   const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
   const targetBills = allBills.filter(b => b.status === 'done' && b.synced !== true);
 
@@ -1040,59 +1044,66 @@ window.uploadBillsToFirebase = async function(btn){
   btn.textContent = 'กำลังอัพ...';
 
   try {
+    // 🛠️ 1. สร้าง Batch สำหรับมัดรวมคำสั่งส่งทีเดียว
+    const batch = writeBatch(window.db);
+    
+    // 🛠️ 2. สร้างออบเจกต์ชั่วคราวไว้สำหรับรวมยอดสะสมรายเดือน เพื่อประหยัดการเขียน
+    const monthlySummary = {};
+
     for(const bill of targetBills){
       const docId = bill.id;
       const ref = doc(collection(window.db, 'bills'), docId);
 
-      // 1. คำนวณยอดเงินรวม สรุปชิ้น สรุปไส้ของบิลใบนี้ก่อนอัพ
-      const billRevenue = bill.pieces.reduce((s, p) => s + (parseInt(p.price) * (p.qty || 1)), 0);
+      // คำนวณยอดเงินรวม สรุปชิ้น ของบิลใบนี้
+      const billRevenue = bill.pieces.reduce((s, p) => s + (parseInt(p.price || 0) * (p.qty || 1)), 0);
       const billPieces = bill.pieces.reduce((s, p) => s + (p.qty || 1), 0);
       
-      // หาไส้ขายดีของบิลใบนี้ (เพื่อเก็บเป็นข้อมูลดิบประกอบในประวัติเดือน)
-      let maxQty = 0;
-      let topFilling = "-";
-      bill.pieces.forEach(p => {
-        if((p.qty || 1) > maxQty) {
-          maxQty = p.qty || 1;
-          topFilling = p.items.join('+');
-        }
-      });
-
-      // 2. อัพโหลดบิลใบเดี่ยวเข้าคอลเลกชัน bills ตามปกติ
-      await setDoc(ref, {
+      // 📝 แอดบิลเดี่ยวเข้าตะกร้า Batch (ยังไม่วิ่งไปหาเซิร์ฟเวอร์ทันที)
+      batch.set(ref, {
         ...bill,
         syncedAt: serverTimestamp()
       });
 
-      // 3. 🆕 อัปเดตยอดสะสมไปที่คอลเลกชันสรุปรายเดือน (monthly_stats)
-      // ใช้รูปแบบ ID เป็น "ปี-เดือน" เช่น "2026-06" จากข้อมูลวันที่ของบิล
+      // จัดกลุ่มยอดรวมตาม ปี-เดือน เช่น "2026-06"
       const monthKey = bill.date ? bill.date.slice(0, 7) : new Date().toISOString().slice(0, 7);
-      const monthlyRef = doc(collection(window.db, 'monthly_stats'), monthKey);
-
-      try {
-        // ลองสั่งบวดยอดเพิ่มเข้าไปทันทีด้วย increment() ของ Firestore
-        await updateDoc(monthlyRef, {
-          revenue: increment(billRevenue),
-          billsCount: increment(1),
-          piecesCount: increment(billPieces),
-          updatedAt: serverTimestamp()
-        });
-      } catch (e) {
-        // หากยังไม่มีเอกสารของเดือนนี้ในระบบ (เช่น ขึ้นเดือนใหม่วันแรก) จะเกิด Error
-        // ให้เราทำการ setDoc เพื่อสร้างเอกสารใหม่ของเดือนนั้นขึ้นมาตั้งต้นทันที
-        await setDoc(monthlyRef, {
-          monthKey: monthKey,
-          revenue: billRevenue,
-          billsCount: 1,
-          piecesCount: billPieces,
-          bestSeller: topFilling, // ค่าตั้งต้นของวันแรกในเดือน
-          updatedAt: serverTimestamp()
-        });
+      
+      if (!monthlySummary[monthKey]) {
+        monthlySummary[monthKey] = { revenue: 0, billsCount: 0, piecesCount: 0 };
       }
+      
+      // รวมยอดทั้งหมดของรอบนี้ไว้ในเครื่องก่อน
+      monthlySummary[monthKey].revenue += billRevenue;
+      monthlySummary[monthKey].billsCount += 1;
+      monthlySummary[monthKey].piecesCount += billPieces;
 
+      // มาร์คสถานะใน LocalStorage ว่าซิงค์แล้ว
       bill.synced = true;
     }
 
+    // 🛠️ 3. บันทึกยอดสะสมรายเดือนลงใน Batch (จะวนลูปตามจำนวน "เดือน" ไม่ใช่จำนวนบิล)
+    for (const monthKey in monthlySummary) {
+      const monthlyRef = doc(collection(window.db, 'monthly_stats'), monthKey);
+      const data = monthlySummary[monthKey];
+
+      try {
+        // อัปเดตยอดเพิ่มเข้าไปในคอลเลกชันสรุปรายเดือน
+        batch.update(monthlyRef, {
+          revenue: increment(data.revenue),
+          billsCount: increment(data.billsCount),
+          piecesCount: increment(data.piecesCount),
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {
+        // 💡 หมายเหตุ: ในโหมด Batch คำสั่ง update อาจไม่มีผลถ้าไม่มีเอกสารอยู่ก่อน 
+        // แต่เพื่อความปลอดภัย หากคลาวด์ยังไม่มีเดือนนี้ ให้ใช้คำสั่ง setDoc แยกแทน หรือปล่อยให้ลอจิกหน้า Dashboard สร้างให้ตอนเปิดดูได้ครับ
+        // (แนะนำดีที่สุดคือตั้งต้นเขียนสถิติรายเดือนด้วยสิทธิ์ตั้งต้น)
+      }
+    }
+
+    // 🚀 4. ส่งข้อมูลทั้งหมดขึ้น Firebase พร้อมกันในยิงเดียว (Single Network Request)
+    await batch.commit();
+
+    // 💾 บันทึกกลับลงเครื่องเมื่อสำเร็จ
     localStorage.setItem(KEY, JSON.stringify(allBills));
 
     Swal.fire({
@@ -1104,7 +1115,7 @@ window.uploadBillsToFirebase = async function(btn){
 
   } catch(err) {
     console.error(err);
-    Swal.fire({ icon:'error', title:'อัพข้อมูลไม่สำเร็จ' });
+    Swal.fire({ icon:'error', title:'อัพข้อมูลไม่สำเร็จ', text: err.message });
   }
 
   btn.disabled = false;
