@@ -1002,92 +1002,89 @@ renderCurrent();
 </script>
 
 <script type="module">
-  import {
-    collection,
-    doc,
-    setDoc,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  // เพิ่ม increment เข้ามาจาก SDK เพื่อใช้สะสมยอด
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  increment,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  window.uploadBillsToFirebase = async function(btn){
-if(btn.disabled) return;
+// ⚠️ เปลี่ยนเฉพาะตัวแปรนี้ด้านบน หรือแปะไว้หัวฟังก์ชัน: ใส่ Web App URL ที่ได้จาก Google Sheets
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxuz2KSmS5YPNH6NMqhw6KYkaa21szfjz7XpExnY04rCFLvzq9bzRLvNGbnx4swl4rJ7g/exec";
 
-const confirm = await Swal.fire({
-title:'อัพโหลดข้อมูล?',
-text:'ต้องการส่งบิลที่เสร็จแล้วไป Firebase',
-icon:'question',
-showCancelButton:true,
-confirmButtonText:'อัพข้อมูล',
-cancelButtonText:'ยกเลิก'
-});
+window.uploadBillsToFirebase = async function(btn){ // ใช้ชื่อฟังก์ชันเดิมเพื่อไม่ให้ปุ่มที่หน้าจอพัง
+  if(btn.disabled) return;
 
-if(!confirm.isConfirmed) return;
+  const confirm = await Swal.fire({
+    title: 'อัพโหลดข้อมูล?',
+    text: 'ต้องการส่งบิลที่เสร็จแล้วไป Google Sheets',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'อัพข้อมูล',
+    cancelButtonText: 'ยกเลิก'
+  });
 
-const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+  if(!confirm.isConfirmed) return;
 
-const targetBills = allBills.filter(
-b => b.status === 'done' && b.synced !== true
-);
+  const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+  const targetBills = allBills.filter(b => b.status === 'done' && b.synced !== true);
 
-if(!targetBills.length){
-Swal.fire({
-icon:'info',
-title:'ไม่มีบิลใหม่',
-timer:1500,
-showConfirmButton:false
-});
-return;
+  if(!targetBills.length){
+    Swal.fire({ icon: 'info', title: 'ไม่มีบิลใหม่', timer: 1500, showConfirmButton: false });
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  const oldText = btn.textContent;
+  btn.textContent = 'กำลังอัพ...';
+
+  try {
+    // ยิงข้อมูลบิลใหม่ทั้งหมดส่งไปที่ Google Sheets ในรอบเดียว (POST Request)
+    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "text/plain" }, // ใช้ text/plain เพื่อเลี่ยงปัญหาระบบรักษาความปลอดภัย CORS ของ Google
+      body: JSON.stringify({
+        action: "uploadBills",
+        data: targetBills
+      })
+    });
+
+    const resData = await response.json();
+    
+    if(resData.status === "success") {
+      // เมื่อ Google Sheets ปลายทางเซฟข้อมูลลงตารางสำเร็จแล้ว ให้มาร์คสถานะใน LocalStorage เป็น true
+      targetBills.forEach(b => b.synced = true);
+      localStorage.setItem(KEY, JSON.stringify(allBills));
+
+      // เรียกฟังก์ชันวาดรายการหน้าจอใหม่ (ใช้ชื่อฟังก์ชันแสดงผลเดิมของแอปคุณ)
+      if (typeof renderBills === "function") renderBills(); 
+      else if (typeof renderBillList === "function") renderBillList();
+
+      Swal.fire({
+        icon: 'success',
+        title: `อัพข้อมูลแล้ว ${targetBills.length} บิล`,
+        timer: 1600,
+        showConfirmButton: false
+      });
+    } else {
+      throw new Error(resData.message);
+    }
+
+  } catch(err) {
+    console.error(err);
+    Swal.fire({ icon: 'error', title: 'อัพข้อมูลไม่สำเร็จ', text: err.message });
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = oldText;
 }
 
-btn.disabled = true;
-btn.classList.add('loading');
-const oldText = btn.textContent;
-btn.textContent = 'กำลังอัพ...';
-
-try{
-
-for(const bill of targetBills){
-
-const docId = bill.id;
-
-const ref = doc(
-collection(window.db,'bills'),
-docId
-);
-
-await setDoc(ref,{
-...bill,
-syncedAt: serverTimestamp()
-});
-
-bill.synced = true;
-}
-
-localStorage.setItem(KEY, JSON.stringify(allBills));
-
-Swal.fire({
-icon:'success',
-title:`อัพข้อมูลแล้ว ${targetBills.length} บิล`,
-timer:1600,
-showConfirmButton:false
-});
-
-}catch(err){
-
-console.error(err);
-
-Swal.fire({
-icon:'error',
-title:'อัพข้อมูลไม่สำเร็จ'
-});
-
-}
-
-btn.disabled = false;
-btn.classList.remove('loading');
-btn.textContent = oldText;
-
-}
 </script>
 
 <script type="module">
