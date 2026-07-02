@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Ma Kin Tokyo Order Pro</title>
+    <title>MaKin Tokyo Order GS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
     
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -227,6 +227,46 @@ body.dark #floatingBillBtn{
 .sync-btn.pull:disabled{
   background:#9ca3af;
 }
+
+/* หน้าจอ Loading บังส่วนกลางจอ */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* พื้นหลังดำโปร่งแสง */
+    z-index: 100000; /* ให้อยู่เหนือทุกองค์ประกอบ */
+    display: none; /* ซ่อนไว้ก่อน เริ่มทำงานค่อยแสดง */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    color: white;
+    font-family: 'Kanit', sans-serif;
+}
+
+/* ตัวหมุนวงกลม */
+.center-spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
+    border-top: 6px solid var(--primary); /* ใช้สีส้มหลักของร้าน */
+    border-radius: 50%;
+    animation: spinCenter 1s linear infinite;
+}
+
+@keyframes spinCenter {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 1.2rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
     </style>
 </head>
 <body>
@@ -588,7 +628,7 @@ function renderTodayTotal(){
 
 function renderSummary(){
     const summaryBox = document.getElementById('summaryBox');
-    const dashboardUrl = 'https://rachata-2025-source.github.io/tokyo-dashboard/'; // ⚠️ อย่าลืมเปลี่ยน URL
+    const dashboardUrl = 'https://script.google.com/macros/s/AKfycbyFqdG0fNmWGWepB2CIUBtDG1wRquPux-I9s-j1TAINVU96k2fyO_E7YpX0ma_iPi6w/exec'; // ⚠️ อย่าลืมเปลี่ยน URL
     const expenseUrl = 'https://script.google.com/macros/s/AKfycbwRyfL1zKUYmnCMjzy5vfv4ivtdPyHELSMyjMbNjpcvwgVk8un4O2voAPo1qiu_mN0J/exec';
 
     // 1. สร้าง HTML ส่วนของกลุ่มปุ่ม (Dashboard และ ลงรายรับ-รายจ่าย) อยู่ข้างกัน
@@ -983,200 +1023,168 @@ renderCurrent();
 </script>
 <button id="floatingBillBtn" onclick="toggleBillView()">▼</button>
 
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCx6SGBBh979y6cjyOL75f5PdSr8AZkz0g",
-    authDomain: "tokyo-order-app.firebaseapp.com",
-    projectId: "tokyo-order-app",
-    storageBucket: "tokyo-order-app.firebasestorage.app",
-    messagingSenderId: "411815226779",
-    appId: "1:411815226779:web:373e1ca32daaac264cc53e"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  window.db = getFirestore(app);
-</script>
-
-<script type="module">
-  import {
-    collection,
-    doc,
-    setDoc,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-  window.uploadBillsToFirebase = async function(btn){
-if(btn.disabled) return;
-
-const confirm = await Swal.fire({
-title:'อัพโหลดข้อมูล?',
-text:'ต้องการส่งบิลที่เสร็จแล้วไป Firebase',
-icon:'question',
-showCancelButton:true,
-confirmButtonText:'อัพข้อมูล',
-cancelButtonText:'ยกเลิก'
-});
-
-if(!confirm.isConfirmed) return;
-
-const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
-
-const targetBills = allBills.filter(
-b => b.status === 'done' && b.synced !== true
-);
-
-if(!targetBills.length){
-Swal.fire({
-icon:'info',
-title:'ไม่มีบิลใหม่',
-timer:1500,
-showConfirmButton:false
-});
-return;
-}
-
-btn.disabled = true;
-btn.classList.add('loading');
-const oldText = btn.textContent;
-btn.textContent = 'กำลังอัพ...';
-
-try{
-
-for(const bill of targetBills){
-
-const docId = bill.id;
-
-const ref = doc(
-collection(window.db,'bills'),
-docId
-);
-
-await setDoc(ref,{
-...bill,
-syncedAt: serverTimestamp()
-});
-
-bill.synced = true;
-}
-
-localStorage.setItem(KEY, JSON.stringify(allBills));
-
-Swal.fire({
-icon:'success',
-title:`อัพข้อมูลแล้ว ${targetBills.length} บิล`,
-timer:1600,
-showConfirmButton:false
-});
-
-}catch(err){
-
-console.error(err);
-
-Swal.fire({
-icon:'error',
-title:'อัพข้อมูลไม่สำเร็จ'
-});
-
-}
-
-btn.disabled = false;
-btn.classList.remove('loading');
-btn.textContent = oldText;
-
-}
-</script>
-
-<script type="module">
-  import {
-    collection,
-    getDocs,
-    query,
-    where
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<!-- ปรับเปลี่ยนจาก Firebase SDK ไปใช้งาน Google Sheets Connection แทน -->
+<script>
+  // ⚠️ วาง URL ของ Google Apps Script Web App ที่ได้จากการ Deploy ที่นี่
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxN7Q4ii2pq_AFfxHsT57jdBdMwY1KTbofHjODYNZSoO-8xQJVeaXLSyvT1J7zQaJn8/exec";
 
 
-  window.loadTodayBillsFromFirebase = async function(btn){
-  if(btn.disabled) return;
-
-  const confirm = await Swal.fire({
-    title:'ดึงข้อมูลวันนี้?',
-    text:'โหลดบิลวันนี้จาก Firebase',
-    icon:'question',
-    showCancelButton:true,
-    confirmButtonText:'ดึงข้อมูล',
-    cancelButtonText:'ยกเลิก'
-  });
-
-  if(!confirm.isConfirmed) return;
-
-  if(!window.db){
-    Swal.fire({icon:'error',title:'ยังไม่ได้เชื่อม Firebase'});
-    return;
+  // ฟังก์ชันช่วย เปิด-ปิด การแสดงผลไอคอนกลางหน้าจอ
+  function showLoading(text) {
+    document.getElementById('globalLoadingText').innerText = text || "กำลังทำงาน...";
+    document.getElementById('globalLoading').style.display = 'flex';
   }
 
-  btn.disabled = true;
-  btn.classList.add('loading');
-  const oldText = btn.textContent;
-  btn.textContent = 'กำลังดึง...';
+  function hideLoading() {
+    document.getElementById('globalLoading').style.display = 'none';
+  }
 
-  try{
+  // ฟังก์ชันอัปโหลดข้อมูลไปยัง Google Sheet
+  window.uploadBillsToFirebase = async function(btn){
+    if(btn.disabled) return;
 
-    const today = new Date().toISOString().slice(0,10);
+    const confirm = await Swal.fire({
+      title: 'อัพโหลดข้อมูล?',
+      text: 'ต้องการส่งบิลที่เสร็จแล้วไปที่ Google Sheets',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'อัพข้อมูล',
+      cancelButtonText: 'ยกเลิก'
+    });
 
-    const q = query(
-      collection(window.db,'bills'),
-      where('date','==',today)
+    if(!confirm.isConfirmed) return;
+
+    const allBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const targetBills = allBills.filter(
+      b => b.status === 'done' && b.synced !== true
     );
 
-    const snap = await getDocs(q);
+    if(!targetBills.length){
+      Swal.fire({
+        icon: 'info',
+        title: 'ไม่มีบิลใหม่ให้ซิงค์',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
 
-    const pulledBills = snap.docs.map(d => ({
-      ...d.data(),
-      synced:true
-    }));
+    // เริ่มทำงาน: เปิดไอคอนกลางจอ และล็อกปุ่ม
+    btn.disabled = true;
+    btn.classList.add('loading');
+    showLoading("กำลังอัปโหลดข้อมูลออเดอร์...");
 
-    const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: "upload",
+          bills: targetBills
+        })
+      });
 
-    const map = {};
+      const resData = await response.json();
 
-    [...localBills, ...pulledBills].forEach(b=>{
-      if(b && b.id) map[b.id] = b;
+      if(resData.status === "success") {
+        targetBills.forEach(b => b.synced = true);
+        localStorage.setItem(KEY, JSON.stringify(allBills));
+
+        Swal.fire({
+          icon: 'success',
+          title: `อัพข้อมูลสำเร็จ ${targetBills.length} บิล`,
+          timer: 1600,
+          showConfirmButton: false
+        });
+      } else {
+        throw new Error(resData.message);
+      }
+
+    } catch(err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'อัพข้อมูลไม่สำเร็จ',
+        text: 'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ'
+      });
+    } finally {
+      // ทำงานเสร็จสิ้น (ไม่ว่าจะสำเร็จหรือพัง): ปิดไอคอนกลางจอ คืนค่าปุ่ม
+      hideLoading();
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  };
+
+  // ฟังก์ชันดึงข้อมูลวันนี้จาก Google Sheet
+  window.loadTodayBillsFromFirebase = async function(btn){
+    if(btn.disabled) return;
+
+    const confirm = await Swal.fire({
+      title: 'ดึงข้อมูลวันนี้?',
+      text: 'โหลดบิลวันนี้จาก Google Sheets',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'ดึงข้อมูล',
+      cancelButtonText: 'ยกเลิก'
     });
 
-    const merged = Object.values(map);
+    if(!confirm.isConfirmed) return;
 
-    localStorage.setItem(KEY, JSON.stringify(merged));
+    // เริ่มทำงาน: เปิดไอคอนกลางจอ และล็อกปุ่ม
+    btn.disabled = true;
+    btn.classList.add('loading');
+    showLoading("กำลังดึงข้อมูลออเดอร์ของวันนี้...");
 
-    recalcBillCounter();
-    renderBills();
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const response = await fetch(`${SCRIPT_URL}?date=${today}`, {
+        method: 'GET',
+        mode: 'cors'
+      });
 
-    Swal.fire({
-      icon:'success',
-      title:`ดึงข้อมูลแล้ว ${pulledBills.length} บิล`,
-      timer:1600,
-      showConfirmButton:false
-    });
+      const pulledBills = await response.json();
 
-  }catch(err){
+      if (Array.isArray(pulledBills)) {
+        const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
+        const map = {};
 
-    console.error(err);
+        [...localBills, ...pulledBills].forEach(b => {
+          if(b && b.id) map[b.id] = b;
+        });
 
-    Swal.fire({
-      icon:'error',
-      title:'ดึงข้อมูลไม่สำเร็จ'
-    });
+        const merged = Object.values(map);
+        localStorage.setItem(KEY, JSON.stringify(merged));
 
-  }
+        recalcBillCounter();
+        renderBills();
 
-  btn.disabled = false;
-  btn.classList.remove('loading');
-  btn.textContent = oldText;
-}
+        Swal.fire({
+          icon: 'success',
+          title: `ดึงข้อมูลแล้ว ${pulledBills.length} บิล`,
+          timer: 1600,
+          showConfirmButton: false
+        });
+      } else {
+        throw new Error("ข้อมูลตอบกลับผิดพลาด");
+      }
+
+    } catch(err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'ดึงข้อมูลไม่สำเร็จ'
+      });
+    } finally {
+      // ทำงานเสร็จสิ้น: ปิดไอคอนกลางจอ คืนค่าปุ่ม
+      hideLoading();
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  };
 </script>
+
+
 
 <div id="floatingMenuModal" style="display: none; position: fixed; bottom: 85px; right: 20px; z-index: 9999; width: calc(100% - 40px); max-width: 350px;">
     <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 16px; background: white; border: 1px solid #eee;">
@@ -1241,5 +1249,10 @@ window.addEventListener('click', function(e) {
     }
 });
 </script>
+<!-- กล่องแสดงสถานะความคืบหน้าตรงกลางหน้าจอ -->
+<div id="globalLoading" class="loading-overlay">
+    <div class="center-spinner"></div>
+    <div id="globalLoadingText" class="loading-text">กำลังประมวลผล...</div>
+</div>
 </body>
 </html>
