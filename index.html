@@ -479,7 +479,8 @@ function saveBill(){
     const b = bills.find(x => x.id === editingBillId);
         if(b){ 
             b.pieces = JSON.parse(JSON.stringify(currentPieces)); 
-            b.note = noteEl.value; 
+            b.note = noteEl.value;
+            b.synced = false; // ⭐ [เพิ่มบรรทัดนี้] เพื่อระบุว่ามีการแก้ไขข้อมูลใหม่ และปลดล็อกให้ส่งไปอัปเดตบน Google Sheets ได้
         }
         editingBillId = null;
     } else {
@@ -967,14 +968,6 @@ renderBills();
 const toggleBtn = document.getElementById('darkToggle');
 
 if(toggleBtn){
-toggleBtn.onclick = () => {
-    document.body.classList.toggle('dark');
-
-    toggleBtn.textContent =
-        document.body.classList.contains('dark') ? '☀️' : '🌙';
-};
-}
-
 toggleBtn.onclick = () => {
     document.body.classList.toggle('dark');
 
