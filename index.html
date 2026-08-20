@@ -339,7 +339,7 @@ let billCounter=parseInt(localStorage.getItem('billCounter')||'1');
 let activeBillNo=null;
 let editingBillId=null;
 
-const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด','20','30','ฟรี'];
+const fillings=['ข้าวโพด','หวาน','เค็ม','รวม','พริกเผา','หมูหยอง','พิซซ่า','ฮอตดอก','หมูสับ','ปูอัด','ซอสไข่กุ้ง','ยำสาหร่าย','ซอสชีส','นูเทลล่า','ฝอยทอง','สตรอเบอรี่','ใบเตย','ไข่','ครีมข้าวโพด','ไข่วง6ชิ้น','แพนเค้ก5ชิ้น','20','30','ฟรี'];
 
 const fillingsBox = document.getElementById('fillingsBox');
 fillingsBox.innerHTML=fillings.map(f=>`<label><input type="checkbox" value="${f}"><span>${f}</span></label>`).join('');
@@ -358,6 +358,8 @@ function calcPrice(items){
     if (items.includes('ฟรี')) return 0;
     if (items.includes('30')) return 30;
     if (items.includes('20')) return 20;
+    if (items.includes('ไข่วง6ชิ้น')) return 20;
+    if (items.includes('แพนเค้ก5ชิ้น')) return 20;
     // -------------------------------------------
 
     let price = BASE;
