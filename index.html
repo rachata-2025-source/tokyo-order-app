@@ -490,7 +490,7 @@ function saveBill(){
         bills.push({
             id: newId,
             billNo: billCounter++, 
-            date: new Date().toISOString().slice(0,10),
+            date: new Date().toLocaleDateString('sv-SE'),
             time: new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
             pieces: JSON.parse(JSON.stringify(currentPieces)), 
             note: noteEl.value, 
