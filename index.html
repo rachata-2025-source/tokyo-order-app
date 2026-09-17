@@ -269,13 +269,13 @@
             <button class="btn-quick-fill" onclick="quickAddPiece('รวม')">รวม</button>
             <button class="btn-quick-fill" onclick="quickAddPiece('นูเทลล่า')">นูเทลล่า</button>
             <button class="btn-quick-fill" onclick="quickAddPiece('พิซซ่า+ปูอัด')">พิซซ่า+ปูอัด</button>
-            <button class="btn-quick-fill" onclick="quickAddPiece('แพนเค้ก6ชิ้น')">แพนเค้ก6ชิ้น</button>
+            <button class="btn-quick-fill" onclick="quickAddPiece('แพนเค้ก6ชิ้น')">แพนเค้ก</button>
         </div>
 
         <!-- ปุ่มกดเปิด-ปิดส่วนเลือกไส้มาตรฐาน -->
         <div style="display:flex; gap:6px;">
             <button class="btn-toggle-fillings" id="btnToggleFillings" onclick="toggleFillingsBox()">
-                <span>🧇 ไส้มาตรฐาน (ผสมหลายไส้)</span>
+                <span>🧇 เลือกไส้อื่นๆ</span>
                 <span id="fillingsArrow">▼</span>
             </button>
             <button class="btn-toggle-custom" id="btnShowCustom" onclick="toggleCustomArea(true)" style="width:auto; flex-shrink:0;">➕ ระบุไส้เอง</button>
@@ -307,7 +307,8 @@
     </div>
 
     <div id="editHint" style="text-align:center; font-weight:bold; color:var(--danger); font-size:0.9rem;"></div>
-    <div class="card" id="currentBillContainer" style="padding: 12px;">
+    <!-- เพิ่ม display: none; ที่ style ตรงนี้ -->
+<div class="card" id="currentBillContainer" style="padding: 12px; display: none;">
         <span class="section-title" style="margin-bottom:5px;">รายการในบิลตอนนี้</span>
         <div id="currentBill"></div>
         
@@ -455,18 +456,26 @@ function changeQty(step){
 }
 
 function renderCurrent(){
+    const container = document.getElementById('currentBillContainer');
     const currentBillDiv = document.getElementById('currentBill');
-    currentBillDiv.innerHTML='';
-    let total=0;
-    let totalQty = 0;
-    if(currentPieces.length === 0) {
-        currentBillDiv.innerHTML = '<div style="text-align:center; color:#ccc; padding:5px; font-size:0.8rem;">ยังไม่มีรายการในบิล</div>';
+    
+    // เช็คว่าถ้าไม่มีรายการในบิล ให้ซ่อนทั้งกล่อง / ถ้ามีให้แสดงขึ้นมา
+    if (currentPieces.length === 0) {
+        if (container) container.style.display = 'none';
+        return;
+    } else {
+        if (container) container.style.display = 'block';
     }
-    currentPieces.forEach((p,i)=>{
+
+    currentBillDiv.innerHTML = '';
+    let total = 0;
+    let totalQty = 0;
+
+    currentPieces.forEach((p, i) => {
         const lineTotal = p.price * p.qty;
         total += lineTotal;
         totalQty += p.qty || 1;
-        currentBillDiv.innerHTML+=`
+        currentBillDiv.innerHTML += `
             <div class="current-item">
                 <div class="item-row-top">
                     <b style="font-size:1rem;">${p.items.join(' • ')}</b>
@@ -484,6 +493,7 @@ function renderCurrent(){
                 </div>
             </div>`;
     });
+
     currentBillDiv.innerHTML += `
         <div style="text-align:center; font-size:1.2rem; color:#555; font-weight: 500; margin-top:6px;">
             ทั้งหมด ${totalQty} ชิ้น  ${total} บาท
@@ -692,7 +702,26 @@ function renderSummary(){
         </div>`;
     });
 
+    // ... (สคริปต์ส่วนบนของ renderSummary) ...
+
     html += `</div>
+    <!-- แถวปุ่มลิงก์ภายนอก (เพิ่มใหม่ด้านล่าง) -->
+    <div style="display:flex; gap:8px; margin-top:8px;">
+        <a href="https://rachata-2025-source.github.io/tokyo-dashboard/" 
+           target="_self" 
+           class="btn btn-outline btn-sm" 
+           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">
+           📈 หน้าแดชบอร์ด
+        </a>
+        
+        <a href="https://script.google.com/macros/s/AKfycbyFqdG0fNmWGWepB2CIUBtDG1wRquPux-I9s-j1TAINVU96k2fyO_E7YpX0ma_iPi6w/exec" 
+           target="_self" 
+           class="btn btn-outline btn-sm" 
+           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">
+           📜 ข้อมูลย้อนหลัง
+        </a>
+    </div>
+    <!-- แถวปุ่มส่งออกข้อมูล -->
     <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 ส่งออกExcel</button>
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryImage()">🖼️ ส่งออกรูปภาพ</button>
