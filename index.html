@@ -36,14 +36,14 @@
         .quick-fillings-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 6px;
+            margin-bottom: 8px;
         }
         .btn-quick-fill {
             background: #e3f2fd;
             color: #1565c0;
             border: 1px solid #90caf9;
-            padding: 10px 4px;
+            padding: 8px 2px;
             border-radius: 12px;
             font-size: 1.05rem;
             font-weight: 600;
@@ -268,6 +268,8 @@
             <button class="btn-quick-fill" onclick="quickAddPiece('เค็ม')">เค็ม</button>
             <button class="btn-quick-fill" onclick="quickAddPiece('รวม')">รวม</button>
             <button class="btn-quick-fill" onclick="quickAddPiece('นูเทลล่า')">นูเทลล่า</button>
+            <button class="btn-quick-fill" onclick="quickAddPiece('พิซซ่า+ปูอัด')">พิซซ่า+ปูอัด</button>
+            <button class="btn-quick-fill" onclick="quickAddPiece('แพนเค้ก6ชิ้น')">แพนเค้ก6ชิ้น</button>
         </div>
 
         <!-- ปุ่มกดเปิด-ปิดส่วนเลือกไส้มาตรฐาน -->
@@ -949,8 +951,11 @@ renderCurrent();
 <button id="floatingBillBtn" onclick="toggleBillView()">▼</button>
 
 <!-- การเชื่อมต่อ Firebase Realtime Database -->
+<!-- ตรวจสอบว่าใน <head> มีการใส่ CDN ของ Firestore แล้ว -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
 <script>
-  // ⚠️ นำการตั้งค่าจาก Firebase Console ของคุณมาวางเปลี่ยนตรงนี้
   const firebaseConfig = {
     apiKey: "AIzaSyAC6NW0BCQMdmoN0GwNNImM1PWzJ_YXebo",
     authDomain: "makin-tokyo-order-firebase.firebaseapp.com",
@@ -964,7 +969,8 @@ renderCurrent();
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
-  const db = firebase.database();
+  // เปลี่ยนมาใช้ Firestore ให้ตรงกับแดชบอร์ด
+  const db = firebase.firestore();
 
   function showLoading(text) {
     document.getElementById('globalLoadingText').innerText = text || "กำลังทำงาน...";
@@ -975,13 +981,13 @@ renderCurrent();
     document.getElementById('globalLoading').style.display = 'none';
   }
 
-  // อัปโหลดบิลไปที่ Firebase
+  // อัปโหลดบิลไปที่ Firebase (Firestore)
   window.uploadBillsToFirebase = async function(btn){
     if(btn.disabled) return;
 
     const confirm = await Swal.fire({
       title: 'อัพโหลดข้อมูล?',
-      text: 'ต้องการส่งบิลที่เสร็จแล้วไปที่ Firebase Database',
+      text: 'ต้องการส่งบิลที่เสร็จแล้วไปที่ Firebase Firestore',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'อัพข้อมูล',
@@ -1010,12 +1016,15 @@ renderCurrent();
     showLoading("กำลังอัปโหลดข้อมูลไป Firebase...");
 
     try {
-      const updates = {};
+      // ใช้ Batch Write ใน Firestore
+      const batch = db.batch();
+      
       targetBills.forEach(b => {
-        updates['/bills/' + b.id] = b;
+        const docRef = db.collection('orders').doc(String(b.id));
+        batch.set(docRef, b, { merge: true });
       });
 
-      await db.ref().update(updates);
+      await batch.commit();
 
       targetBills.forEach(b => b.synced = true);
       localStorage.setItem(KEY, JSON.stringify(allBills));
@@ -1041,13 +1050,13 @@ renderCurrent();
     }
   };
 
-  // ดึงข้อมูลวันนี้จาก Firebase
+  // ดึงข้อมูลวันนี้จาก Firebase (Firestore)
   window.loadTodayBillsFromFirebase = async function(btn){
     if(btn.disabled) return;
 
     const confirm = await Swal.fire({
       title: 'ดึงข้อมูลวันนี้?',
-      text: 'โหลดบิลวันนี้จาก Firebase Database',
+      text: 'โหลดบิลวันนี้จาก Firebase Firestore',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'ดึงข้อมูล',
@@ -1061,11 +1070,13 @@ renderCurrent();
     showLoading("กำลังดึงข้อมูลจาก Firebase...");
 
     try {
-      const today = new Date().toLocaleDateString('sv-SE');
-      const snapshot = await db.ref('bills').orderByChild('date').equalTo(today).once('value');
+      const today = new Date().toISOString().split('T')[0];
+      const snapshot = await db.collection('orders').where('date', '==', today).get();
       
-      const pulledData = snapshot.val();
-      const pulledBills = pulledData ? Object.values(pulledData) : [];
+      const pulledBills = [];
+      snapshot.forEach(doc => {
+        pulledBills.push(doc.data());
+      });
 
       const localBills = JSON.parse(localStorage.getItem(KEY) || '[]');
       const map = {};
@@ -1077,8 +1088,8 @@ renderCurrent();
       const merged = Object.values(map);
       localStorage.setItem(KEY, JSON.stringify(merged));
 
-      recalcBillCounter();
-      renderBills();
+      if (typeof recalcBillCounter === 'function') recalcBillCounter();
+      if (typeof renderBills === 'function') renderBills();
 
       Swal.fire({
         icon: 'success',
