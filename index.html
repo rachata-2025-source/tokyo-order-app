@@ -22,10 +22,10 @@
 
     <style>
         :root {
-            --primary: #FF9800; --primary-dark: #F57C00; --secondary: #2196F3;
-            --success: #4CAF50; --danger: #F44336; --bg: #F8F9FA;
-            --card-shadow: 0 8px 30px rgba(0,0,0,0.05); --border-radius: 16px;
-        }
+    --primary: #FF9800; --primary-dark: #E65100; --secondary: #3B82F6;
+    --success: #10B981; --danger: #EF4444; --bg: #F3F4F6;
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.03); --border-radius: 16px;
+}
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; color: #333; margin-bottom: 100px;}
         .container { max-width: 98%; margin: 0 auto; }
@@ -40,22 +40,22 @@
             margin-bottom: 10px;
         }
         .btn-quick-fill {
-            background: #e3f2fd;
-            color: #1565c0;
-            border: 1px solid #90caf9;
-            padding: 4px 4px;
-            border-radius: 12px;
-            font-size: 1.05rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-            transition: 0.2s;
-            font-family: 'Kanit', sans-serif;
-        }
-        .btn-quick-fill:active {
-            transform: scale(0.95);
-            background: #bbdefb;
-        }
+    background: #FFF7ED;
+    color: #C2410C;
+    border: 1px solid #FFEDD5;
+    padding: 4px 4px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.2s;
+    font-family: 'Kanit', sans-serif;
+}
+.btn-quick-fill:active {
+    transform: scale(0.95);
+    background: #FFEDD5;
+}
 
         /* Toggle Fillings Button */
         .btn-toggle-fillings {
@@ -150,16 +150,17 @@
 
         /* ===== DARK MODE ===== */
         body.dark {
-            --bg: #121212;
-            --primary: #FFB74D;
-            --primary-dark: #FFA726;
-            --secondary: #64B5F6;
-            --success: #66BB6A;
-            --danger: #EF5350;
-            background-color: var(--bg);
-            color: #eee;
-        }
-        body.dark .card { background: #1E1E1E; border: 1px solid rgba(255,255,255,0.05); }
+    --bg: #18181B;
+    --primary: #FFB74D;
+    --primary-dark: #FFA726;
+    --secondary: #60A5FA;
+    --success: #34D399;
+    --danger: #F87171;
+    background-color: var(--bg);
+    color: #F4F4F5;
+}
+body.dark .card { background: #27272A; border: 1px solid rgba(255,255,255,0.07); }
+body.dark .btn-quick-fill { background: #3F3F46; color: #FFD8A8; border-color: #52525B; }
         body.dark .note1 { color: #121212; }
         body.dark .section-title { color: #aaa; }
         body.dark .fillings-grid span { background: #2A2A2A; color: #ddd; }
@@ -169,7 +170,6 @@
         body.dark .btn-outline { background: #1E1E1E; color: #ddd; border-color: #333; }
         body.dark .price-input-group { background: #2A2A2A; }
         body.dark .price-input-group input { color: #fff; }
-        body.dark .btn-quick-fill { background: #1e3a8a; color: #93c5fd; border-color: #1d4ed8; }
         body.dark .btn-toggle-fillings { background: #2a2a2a; color: #ddd; border-color: #333; }
 
         #floatingBillBtn{
