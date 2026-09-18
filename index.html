@@ -642,14 +642,35 @@ function renderSummary(){
     const summaryBox = document.getElementById('summaryBox');
     const bills = JSON.parse(localStorage.getItem(KEY) || '[]').filter(b => b.status === 'done');
 
+    // แยก HTML ของปุ่มลิงก์ภายนอกออกมาไว้ตรงกลางเพื่อนำไปใช้ซ้ำ
+    const externalLinksHtml = `
+    <div style="display:flex; gap:8px; margin-top:8px;">
+        <a href="https://rachata-2025-source.github.io/tokyo-dashboard/" 
+            
+           class="btn btn-outline btn-sm" 
+           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; font-size: 1.2rem;">
+           📈 หน้าแดชบอร์ด
+        </a>
+        
+        <a href="https://script.google.com/macros/s/AKfycbyFqdG0fNmWGWepB2CIUBtDG1wRquPux-I9s-j1TAINVU96k2fyO_E7YpX0ma_iPi6w/exec" 
+           
+           class="btn btn-outline btn-sm" 
+           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; font-size: 1.2rem;">
+           📜 ข้อมูลย้อนหลัง
+        </a>
+    </div>`;
+
+    // กรณีไม่มีข้อมูลการขายในวันนี้
     if(!bills.length){
         summaryBox.innerHTML = `
             <div class="card" style="text-align:center; padding:30px; color:#ccc;">
                 ยังไม่มีข้อมูลการขายในวันนี้
-            </div>`;
+            </div>
+            ${externalLinksHtml}`; // ใส่ปุ่มลิงก์ต่อท้ายไว้ตรงนี้ด้วย
         return;
     }
 
+    // กรณีมีข้อมูลการขาย
     const summaryDate = bills[0]?.date || '-';
     let totalMoney = 0, totalBills = bills.length, totalPieces = 0, itemMap = {};
 
@@ -702,25 +723,7 @@ function renderSummary(){
         </div>`;
     });
 
-    // ... (สคริปต์ส่วนบนของ renderSummary) ...
-
-    html += `</div>
-    <!-- แถวปุ่มลิงก์ภายนอก (เพิ่มใหม่ด้านล่าง) -->
-    <div style="display:flex; gap:8px; margin-top:8px;">
-        <a href="https://rachata-2025-source.github.io/tokyo-dashboard/" 
-           target="_self" 
-           class="btn btn-outline btn-sm" 
-           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; font-size: 1.2rem;">
-           📈 หน้าแดชบอร์ด
-        </a>
-        
-        <a href="https://script.google.com/macros/s/AKfycbyFqdG0fNmWGWepB2CIUBtDG1wRquPux-I9s-j1TAINVU96k2fyO_E7YpX0ma_iPi6w/exec" 
-           target="_self" 
-           class="btn btn-outline btn-sm" 
-           style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; font-size: 1.2rem;">
-           📜 ข้อมูลย้อนหลัง
-        </a>
-    </div>
+    html += `</div>` + externalLinksHtml + `
     <!-- แถวปุ่มส่งออกข้อมูล -->
     <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="exportSummaryExcel()">📊 ส่งออกExcel</button>
